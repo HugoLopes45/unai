@@ -88,6 +88,8 @@ unai --annotate < file.ts
 
 Text rules are word-boundary aware: `"pivotale"` (French) and `"commencement"` pass through unchanged. Content inside fenced code blocks, inline backtick spans, and bare URL lines is never flagged.
 
+Works with any programming language. Code rules match comment syntax (`#`, `//`, `--`, `/* */`), naming patterns, and commit messages regardless of what language the file is written in.
+
 ## Why this exists
 
 LLMs generate the statistical median of "correct writing." That median is padded,

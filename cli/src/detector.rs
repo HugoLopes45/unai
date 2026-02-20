@@ -3,6 +3,7 @@
 pub enum Mode {
     Text,
     Code,
+    CommitMsg,
 }
 
 const CODE_EXTENSIONS: &[&str] = &[
@@ -21,8 +22,7 @@ const CODE_CONTENT_SIGNALS: &[&str] = &[
 pub fn detect_mode(filename: Option<&str>, content: &str) -> Mode {
     if let Some(name) = filename {
         if is_commit_msg_file(name) {
-            // Commit messages are a special case of text
-            return Mode::Text;
+            return Mode::CommitMsg;
         }
         if let Some(ext) = extension_of(name) {
             if CODE_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
@@ -99,7 +99,8 @@ mod tests {
     }
 
     #[test]
-    fn commit_msg_file_is_text() {
-        assert_eq!(detect_mode(Some("COMMIT_EDITMSG"), "feat: add thing"), Mode::Text);
+    fn commit_msg_file_is_commit_msg() {
+        assert_eq!(detect_mode(Some("COMMIT_EDITMSG"), "feat: add thing"), Mode::CommitMsg);
+        assert_eq!(detect_mode(Some("MERGE_MSG"), "Merge branch foo"), Mode::CommitMsg);
     }
 }

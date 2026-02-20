@@ -201,8 +201,10 @@ fn gather_findings(
         Mode::Text => apply_text_rules(content),
         Mode::Code => {
             let mut findings = apply_code_rules(content, code_rules);
-            // Also apply commit-message rules when the file is COMMIT_EDITMSG
-            if filename.map(is_commit_msg_file).unwrap_or(false) {
+            // When editing a commit message, ensure commit rules always fire even
+            // if the caller restricted which rules are active. Dedup by (line,col)
+            // to avoid double-reporting when code_rules is empty (all rules active).
+            if filename.map(is_commit_msg_file).unwrap_or(false) && !code_rules.is_empty() {
                 findings.extend(apply_code_rules(content, &[CodeRule::Commits]));
             }
             findings

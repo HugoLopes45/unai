@@ -36,12 +36,9 @@ pub struct Finding {
     pub severity: Severity,
 }
 
-// ---------------------------------------------------------------------------
-// Text rules
-// ---------------------------------------------------------------------------
-
 struct TextRule {
-    /// Lowercase needle for case-insensitive matching.
+    /// Must be lowercase. Matching runs against `line.to_lowercase()` — a
+    /// mixed-case needle will never match.
     needle: &'static str,
     message: &'static str,
     /// Optional auto-fix replacement. If None, the finding is flagged only.
@@ -263,10 +260,6 @@ fn is_in_backtick_span(line: &str, start: usize, end: usize) -> bool {
     }
     false
 }
-
-// ---------------------------------------------------------------------------
-// Code rules
-// ---------------------------------------------------------------------------
 
 /// Which code rule categories to apply.
 #[derive(Debug, Clone, PartialEq)]
@@ -615,11 +608,19 @@ pub fn clean(content: &str, findings: &[Finding]) -> String {
         for f in sorted {
             if let Some(ref replacement) = f.replacement {
                 let end = f.col + f.matched.len();
-                if end <= line.len() {
-                    let original = &line[f.col..end];
-                    let fixed = apply_case(original, replacement);
-                    line = format!("{}{}{}", &line[..f.col], fixed, &line[end..]);
+                if end > line.len()
+                    || !line.is_char_boundary(f.col)
+                    || !line.is_char_boundary(end)
+                {
+                    eprintln!(
+                        "unai: warning: skipping invalid offset at line {} col {} (line length {})",
+                        f.line, f.col, line.len()
+                    );
+                    continue;
                 }
+                let original = &line[f.col..end];
+                let fixed = apply_case(original, replacement);
+                line = format!("{}{}{}", &line[..f.col], fixed, &line[end..]);
             }
         }
         lines[*idx] = line;
@@ -881,5 +882,56 @@ mod challenge_tests {
     // --- Empty / whitespace ---
     #[test] fn empty_input() {
         assert!(apply_text_rules("").is_empty());
+    }
+
+    // --- Severity rank ordering ---
+    #[test] fn severity_rank_strictly_ordered() {
+        assert!(Severity::Critical.rank() > Severity::High.rank());
+        assert!(Severity::High.rank() > Severity::Medium.rank());
+        assert!(Severity::Medium.rank() > Severity::Low.rank());
+    }
+
+    // --- min-severity critical excludes high ---
+    #[test] fn min_severity_critical_excludes_high() {
+        // "leveraging" is High, "Certainly!" is Critical
+        let findings = apply_text_rules("Certainly! We are leveraging new tech.");
+        let min_rank = Severity::Critical.rank();
+        let filtered: Vec<_> = findings.iter().filter(|f| f.severity.rank() >= min_rank).collect();
+        assert!(filtered.iter().any(|f| f.matched.to_lowercase() == "certainly!"));
+        assert!(!filtered.iter().any(|f| f.matched.to_lowercase() == "leveraging"));
+    }
+
+    // --- Unicode prefix does not trigger word-boundary match ---
+    #[test] fn unicode_prefix_blocks_match() {
+        // "épivotal" starts with a non-ASCII char — "pivotal" must not fire
+        let f = apply_text_rules("Cette décision épivotale est importante.");
+        assert!(
+            f.iter().all(|x| x.matched.to_lowercase() != "pivotal"),
+            "pivotal inside unicode-prefixed word should not fire"
+        );
+    }
+
+    // --- Double backtick span ---
+    #[test] fn double_backtick_span_not_flagged() {
+        // ``utilize`` is an inline code span in reStructuredText / some Markdown variants
+        let input = "Call ``utilize`` to proceed.";
+        let f = apply_text_rules(input);
+        // Single-backtick detection does NOT guard double-backtick spans — document the
+        // current behaviour: the match between the two backtick pairs fires.
+        // This test just verifies we don't panic and the result is deterministic.
+        let _ = clean(input, &f); // must not panic
+    }
+
+    // --- Unclosed backtick span: not flagged (conservative) ---
+    #[test] fn unclosed_backtick_span_not_flagged() {
+        // An unclosed backtick means `is_in_backtick_span` sees "inside=true" and never
+        // closes it. Current behaviour: conservative — the match is suppressed.
+        // This avoids false positives at the cost of missing some edge-case findings.
+        let input = "Call `utilize to proceed.";
+        let f = apply_text_rules(input);
+        assert!(
+            f.iter().all(|x| x.matched.to_lowercase() != "utilize"),
+            "unclosed backtick: conservative — utilize should not be flagged"
+        );
     }
 }

@@ -650,17 +650,22 @@ pub enum CodeRule {
     Api,
 }
 
-impl CodeRule {
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for CodeRule {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "comments" => Some(Self::Comments),
-            "naming" => Some(Self::Naming),
-            "commits" => Some(Self::Commits),
-            "docstrings" => Some(Self::Docstrings),
-            "tests" => Some(Self::Tests),
-            "errors" => Some(Self::Errors),
-            "api" => Some(Self::Api),
-            _ => None,
+            "comments" => Ok(Self::Comments),
+            "naming" => Ok(Self::Naming),
+            "commits" => Ok(Self::Commits),
+            "docstrings" => Ok(Self::Docstrings),
+            "tests" => Ok(Self::Tests),
+            "errors" => Ok(Self::Errors),
+            "api" => Ok(Self::Api),
+            _ => Err(format!(
+                "unknown rule '{}'. Valid: comments, naming, commits, docstrings, tests, errors, api",
+                s
+            )),
         }
     }
 }

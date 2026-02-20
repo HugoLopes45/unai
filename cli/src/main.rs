@@ -14,10 +14,6 @@ use rules::{
     apply_code_rules, apply_structural_rules, apply_text_rules, clean, CodeRule, Finding, Severity,
 };
 
-// ---------------------------------------------------------------------------
-// CLI definition
-// ---------------------------------------------------------------------------
-
 #[derive(Parser, Debug)]
 #[command(
     name = "unai",
@@ -85,10 +81,6 @@ impl MinSeverityArg {
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Entry point
-// ---------------------------------------------------------------------------
 
 fn main() {
     let args = Args::parse();
@@ -165,10 +157,6 @@ fn run(args: Args) -> Result<(), String> {
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Input
-// ---------------------------------------------------------------------------
-
 fn read_input(file_arg: &Option<String>) -> Result<(String, Option<String>), String> {
     match file_arg {
         Some(path) => {
@@ -191,10 +179,6 @@ fn read_input(file_arg: &Option<String>) -> Result<(String, Option<String>), Str
     }
 }
 
-// ---------------------------------------------------------------------------
-// Mode resolution
-// ---------------------------------------------------------------------------
-
 fn resolve_mode(mode_arg: &ModeArg, filename: Option<&str>, content: &str) -> Mode {
     match mode_arg {
         ModeArg::Text => Mode::Text,
@@ -203,22 +187,9 @@ fn resolve_mode(mode_arg: &ModeArg, filename: Option<&str>, content: &str) -> Mo
     }
 }
 
-// ---------------------------------------------------------------------------
-// Rule parsing
-// ---------------------------------------------------------------------------
-
 fn parse_code_rules(raw: &[String]) -> Result<Vec<CodeRule>, String> {
-    raw.iter()
-        .map(|s| {
-            CodeRule::from_str(s.as_str())
-                .ok_or_else(|| format!("unknown rule '{}'. Valid: comments, naming, commits, docstrings, tests, errors, api", s))
-        })
-        .collect()
+    raw.iter().map(|s| s.parse::<CodeRule>()).collect()
 }
-
-// ---------------------------------------------------------------------------
-// Finding collection
-// ---------------------------------------------------------------------------
 
 fn gather_findings(
     content: &str,
@@ -252,10 +223,6 @@ fn gather_findings(
         }
     }
 }
-
-// ---------------------------------------------------------------------------
-// Output helpers
-// ---------------------------------------------------------------------------
 
 fn print_output(text: &str) {
     // Avoid double newline: `print!` is sufficient since clean() preserves

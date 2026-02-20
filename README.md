@@ -51,7 +51,7 @@ Add `prompts/opencode.md` as a system prompt in your OpenCode config.
 
 ### Any LLM (system prompt)
 
-Copy the contents of `prompts/system.md` into your LLM's system prompt field.
+Copy the contents of `prompts/system-prompt.md` into your LLM's system prompt field.
 Works with ChatGPT, Gemini, any OpenAI-compatible API.
 
 ### CLI
@@ -84,17 +84,18 @@ unai --json < response.md
 
 ## Rules reference
 
-Rules live in [`rules/`](rules/). Each file is a plain TOML list of patterns.
+Rules live in [`rules/`](rules/). Each file documents patterns with before/after examples.
 Categories:
 
-- `rules/text.toml` — prose LLM-isms
-- `rules/comments.toml` — code comment patterns
-- `rules/naming.toml` — identifier naming patterns
-- `rules/commits.toml` — commit message patterns
-- `rules/docstrings.toml` — docstring padding
-- `rules/tests.toml` — test naming and structure
-- `rules/errors.toml` — error message patterns
-- `rules/api.toml` — API response language
+- [`rules/text.md`](rules/text.md) — 24 prose LLM-isms
+- [`rules/code-comments.md`](rules/code-comments.md) — comment patterns
+- [`rules/naming.md`](rules/naming.md) — identifier naming
+- [`rules/commits.md`](rules/commits.md) — commit message patterns
+- [`rules/docstrings.md`](rules/docstrings.md) — docstring padding
+- [`rules/tests.md`](rules/tests.md) — test naming and structure
+- [`rules/error-handling.md`](rules/error-handling.md) — error message patterns
+- [`rules/api-design.md`](rules/api-design.md) — API design anti-patterns
+- [`rules/llm-tells.md`](rules/llm-tells.md) — 16 unique AI fingerprints
 
 ## Contributing
 

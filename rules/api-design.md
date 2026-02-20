@@ -1,173 +1,181 @@
 # API design anti-patterns
 
-LLMs design APIs by anticipating every possible caller need and exposing it through a single function with enough parameters to cover all of them. Humans design APIs around the most common use case and make uncommon cases explicit. The difference is felt by every caller, in every refactor, forever.
+LLMs design APIs for the code review, not for the caller. They optimize for symmetry, comprehensiveness, and apparent flexibility — producing interfaces that are harder to use correctly than a simpler alternative would be. Good API design is about reducing the surface area a caller must understand to accomplish one thing.
 
 ---
 
 ## 1. Boolean flag parameters
 
+LLMs add boolean flags when they need slightly different behavior from an existing function. Each flag multiplies internal branching and forces callers to read the signature to understand what `True` does at the call site.
+
 **LLM**
 ```python
 def get_user(
-    user_id: int,
+    user_id: str,
     include_deleted: bool = False,
     with_permissions: bool = True,
     as_dict: bool = False,
-    eager_load: bool = True,
-) -> User | dict:
+) -> User | dict | None:
 ```
 
 **Human**
 ```python
-def get_user(user_id: int) -> User: ...
-def get_deleted_user(user_id: int) -> User: ...
-def get_user_permissions(user_id: int) -> list[Permission]: ...
+def get_user(user_id: str) -> User: ...
+def get_deleted_user(user_id: str) -> User: ...
+def get_user_permissions(user_id: str) -> list[Permission]: ...
 ```
 
-Rule: boolean parameters are branching logic disguised as an argument. Each `True/False` doubles the number of code paths and forces callers to know which combination of flags is valid. Separate the behaviors into separate functions. Names are cheaper than flags.
+Rule: when a boolean parameter changes what a function does rather than how it does it, split into separate functions with clear names.
 
 ---
 
-## 2. "Data" and "Info" suffix types
+## 2. "Data" and "Info" suffixes on return types
+
+LLMs name functions and types with generic suffixes that add no information: `UserData`, `ConfigInfo`, `OrderDetails`, `ResponseObject`. These names exist because the LLM ran out of vocabulary after the noun.
 
 **LLM**
 ```python
-def get_user_data(user_id: int) -> dict:
+def get_user_data() -> dict:
 def fetch_config_info() -> dict:
-def load_session_data() -> dict:
-def retrieve_product_info(sku: str) -> dict:
+def retrieve_order_details() -> OrderDetails:
 ```
 
 **Human**
 ```python
-def get_user(user_id: int) -> User:
+def get_user() -> User:
 def load_config() -> Config:
-def get_session() -> Session:
-def get_product(sku: str) -> Product:
+def get_order() -> Order:
 ```
 
-Rule: "data" and "info" are placeholders for a real type name. If you cannot name the return type, that is a signal to define one. `dict` return types push the burden of knowing the shape onto every caller. Named types are self-documenting, type-checkable, and refactorable.
+Rule: name the thing, not the fact that it is data — if you need a projection, use `UserSummary` or `UserProfile`, not `UserData`.
 
 ---
 
-## 3. **kwargs catch-alls for "extensibility"
+## 3. `**kwargs` catch-alls for "extensibility"
+
+LLMs add `**kwargs` with a comment about future extensibility. The parameter absorbs unknown arguments silently, makes type checking impossible, and hides the real interface behind a comment.
 
 **LLM**
 ```python
-def process(data: bytes, **kwargs) -> Result:
-    """Process data. kwargs are passed through for extensibility."""
-
-def send_request(url: str, **options) -> Response:
-    """Send request. options supports future parameters."""
+def process(data: dict, **kwargs) -> Result:
+    """Process data. kwargs for extensibility."""
+    timeout = kwargs.get("timeout", 30)
+    retries = kwargs.get("retries", 3)
 ```
 
 **Human**
 ```python
-def process(data: bytes, timeout: int = 30, retries: int = 3) -> Result:
-
-def send_request(url: str, timeout: int = 30, headers: dict[str, str] | None = None) -> Response:
+def process(data: dict, timeout: int = 30, retries: int = 3) -> Result:
 ```
 
-Rule: `**kwargs` destroys the contract. Callers cannot discover valid parameters from the signature. Type checkers cannot validate them. IDE autocomplete breaks. "Extensibility" is not a reason to hide parameters; it is a reason to design them carefully now.
+Rule: use explicit typed parameters — `**kwargs` makes the type signature a lie and shifts the documentation burden onto the reader.
 
 ---
 
-## 4. Over-returning
+## 4. Over-returning — more than the caller asked for
+
+LLMs return rich response objects from simple operations. A function named `create_user` returns a dict containing the user, a status code, a message, and the ID separately. The caller asked for a user.
 
 **LLM**
 ```python
-def create_user(name: str, email: str) -> dict:
-    # returns:
-    # {
-    #   "user": {...},
-    #   "status": "created",
-    #   "message": "User created successfully",
-    #   "id": 42,
-    #   "timestamp": "2024-01-01T00:00:00Z"
-    # }
+def create_user(email: str, name: str) -> dict:
+    user = User(email=email, name=name)
+    db.save(user)
+    return {
+        "user": user,
+        "id": user.id,
+        "status": "created",
+        "message": "User created successfully",
+        "created_at": user.created_at.isoformat(),
+    }
 ```
 
 **Human**
 ```python
-def create_user(name: str, email: str) -> User:
-    ...
+def create_user(email: str, name: str) -> User:
+    user = User(email=email, name=name)
+    db.save(user)
+    return user
 ```
 
-Rule: return the thing the function creates. If the caller needs the ID, it is on the `User`. If they need the timestamp, it is on the `User`. Wrapping in a status envelope forces every caller to unwrap it and makes the actual return value harder to access. REST APIs sometimes need envelopes; internal functions do not.
+Rule: return the thing the function created or found — callers who need status or timestamps can read them from the object.
 
 ---
 
 ## 5. Optional everywhere
+
+LLMs mark parameters as optional as a defensive habit. Every parameter might be absent; every return might be null. The result is a function where nothing is required and nothing is guaranteed.
 
 **LLM**
 ```typescript
 function getUser(
     id?: number,
     name?: string,
-    email?: string
-): User | null | undefined {
+    email?: string,
+): User | null | undefined
 ```
 
 **Human**
 ```typescript
-function getUserById(id: number): User        // throws UserNotFound
-function findUserByEmail(email: string): User | null  // null = not found, never undefined
+function getUser(id: number): User  // throws UserNotFound if absent
 ```
 
-Rule: `Optional` parameters signal that the function does not know what it needs. Each optional parameter is a question the caller has to answer. Make required things required. When absence is meaningful, use `null` with a clear documented meaning, not `undefined | null | T`.
+Rule: require what is truly required; make the return type non-nullable unless absence is a legitimate, expected outcome for the caller to handle.
 
 ---
 
-## 6. God functions
+## 6. God functions that do everything
+
+LLMs combine validation, transformation, persistence, and notification in one function because all those things "relate to" the operation. The function cannot be tested without standing up the entire dependency graph.
 
 **LLM**
 ```python
-def handle_registration(
-    name: str,
-    email: str,
-    password: str,
-    plan: str,
-    referral_code: str | None = None,
-) -> dict:
-    # validate inputs
-    # check email uniqueness
-    # hash password
-    # create user in database
-    # create subscription
-    # apply referral discount
-    # send welcome email
-    # send admin notification
-    # log analytics event
-    # return user + token + subscription details
+def register_user(email: str, password: str, send_welcome: bool = True) -> dict:
+    validate_email(email)
+    validate_password_strength(password)
+    if db.users.find_by_email(email):
+        raise DuplicateEmail(email)
+    hashed = hash_password(password)
+    user = db.users.create(email=email, password_hash=hashed)
+    if send_welcome:
+        email_client.send_welcome(user)
+    analytics.track("user_registered", user_id=user.id)
+    audit_log.write("registration", user_id=user.id)
+    return {"user": user, "status": "ok"}
 ```
 
 **Human**
 ```python
-def register_user(name: str, email: str, password: str) -> User:
-    ...  # validate, create, persist
+def register_user(email: str, password: str) -> User:
+    validate_email(email)
+    ensure_not_duplicate(email)
+    return users.create(email, hash_password(password))
 
-def start_subscription(user: User, plan: Plan) -> Subscription:
-    ...
-
-def apply_referral(subscription: Subscription, code: str) -> Subscription:
-    ...
+# Caller or application layer handles notification and analytics
 ```
 
-Rule: a function that validates, persists, emails, logs, and returns a status dict cannot be tested, reused, or reasoned about in isolation. Each step should be a function. The orchestration belongs in the caller or in a use-case layer, not baked into a single function.
+Rule: a function should do one thing; side effects like notifications and analytics belong in the caller or a separate application layer.
 
 ---
 
-## 7. Mirrored getters and setters for everything
+## 7. Mirrored get/set for everything
+
+LLMs generate full getter/setter pairs for every attribute, even in Python where direct attribute access or `@property` is idiomatic. The pattern imports Java conventions into languages that do not need them.
 
 **LLM**
 ```python
 class User:
-    def get_name(self) -> str: return self._name
-    def set_name(self, name: str) -> None: self._name = name
-    def get_email(self) -> str: return self._email
-    def set_email(self, email: str) -> None: self._email = email
-    def get_age(self) -> int: return self._age
-    def set_age(self, age: int) -> None: self._age = age
+    def get_name(self) -> str:
+        return self._name
+
+    def set_name(self, name: str) -> None:
+        self._name = name
+
+    def get_email(self) -> str:
+        return self._email
+
+    def set_email(self, email: str) -> None:
+        self._email = email
 ```
 
 **Human**
@@ -176,107 +184,289 @@ class User:
 class User:
     name: str
     email: str
-    age: int
 
-    def rename(self, new_name: str) -> "User":
-        if not new_name.strip():
-            raise ValueError("name cannot be blank")
-        return replace(self, name=new_name.strip())
+    @property
+    def email(self) -> str:
+        return self._email
+
+    @email.setter
+    def email(self, value: str) -> None:
+        self._email = validate_email(value)
 ```
 
-Rule: Java-style getters and setters in Python are almost never correct. Use `@property` when you need computed access or validation. Use dataclasses or attrs for plain data. Expose domain methods (`rename`, `suspend`, `promote`) rather than raw field access.
+Rule: use direct attribute access in Python; use `@property` only when the accessor needs validation or computation — never generate get/set pairs by default.
 
 ---
 
 ## 8. Async everything
 
+LLMs mark functions `async` by default when writing modern Python or TypeScript. Functions that do pure computation, string manipulation, or in-memory work become coroutines for no reason, requiring `await` at every call site and hiding which operations are actually concurrent.
+
 **LLM**
 ```python
-async def get_username(user: User) -> str:
-    return user.name
+async def format_currency(amount: Decimal, currency: str) -> str:
+    return f"{currency} {amount:.2f}"
 
-async def calculate_total(items: list[Item]) -> Decimal:
-    return sum(item.price for item in items)
-
-async def is_admin(user: User) -> bool:
-    return user.role == "admin"
+async def calculate_tax(subtotal: Decimal, rate: Decimal) -> Decimal:
+    return subtotal * rate
 ```
 
 **Human**
 ```python
-def get_username(user: User) -> str:
-    return user.name
+def format_currency(amount: Decimal, currency: str) -> str:
+    return f"{currency} {amount:.2f}"
 
-def calculate_total(items: list[Item]) -> Decimal:
-    return sum(item.price for item in items)
-
-async def fetch_permissions(user_id: int) -> list[str]:
-    return await db.query(...)  # actually async
+def calculate_tax(subtotal: Decimal, rate: Decimal) -> Decimal:
+    return subtotal * rate
 ```
 
-Rule: async is a contagious annotation that propagates to every caller. Functions that do no I/O should not be async. Marking pure computation async forces callers into async context for no reason and makes the function harder to use in synchronous code.
+Rule: mark a function `async` only when it performs I/O or awaits another coroutine — unnecessary `async` pollutes the call graph and misleads readers about what is concurrent.
 
 ---
 
-## 9. Configuration objects with no schema
+## 9. Config objects that are just dicts with no schema
+
+LLMs pass configuration as `dict` or `Any` because it is flexible. The keys are undocumented, the values are untyped, and typos in key names fail silently at runtime rather than at construction time.
 
 **LLM**
 ```python
-def create_server(config: dict) -> Server:
+def create_client(config: dict) -> Client:
     host = config.get("host", "localhost")
-    port = config.get("port", 8080)
-    debug = config.get("debug", False)
-    # 20 more config.get() calls
+    port = config.get("port", 5432)
+    timeout = config.get("timeout", 30)
 ```
 
 **Human**
 ```python
 @dataclass(frozen=True)
-class ServerConfig:
+class ClientConfig:
     host: str = "localhost"
-    port: int = 8080
-    debug: bool = False
-    workers: int = 4
+    port: int = 5432
+    timeout: int = 30
 
-def create_server(config: ServerConfig) -> Server:
-    ...
+def create_client(config: ClientConfig) -> Client:
 ```
 
-Rule: `dict` configs are stringly-typed. Typos in keys fail silently at runtime, not at the call site. A typed config class gives IDE completion, type checking, and a single place to document each option. It is not over-engineering; it is the minimum viable contract.
+Rule: config is a domain object — give it a type with defaults, validation, and documentation at the field level.
 
 ---
 
-## 10. The options object with fifteen keys
+## 10. The options parameter with undocumented keys
+
+LLMs add an `options` or `config` parameter that accepts arbitrary keys "for flexibility." Callers cannot know what keys exist without reading the implementation. Unused keys are silently ignored.
+
+**LLM**
+```python
+def send_email(to: str, subject: str, body: str, options: dict = {}) -> None:
+    retry = options.get("retry", 3)
+    timeout = options.get("timeout", 10)
+    template = options.get("template", "default")
+    cc = options.get("cc", [])
+    bcc = options.get("bcc", [])
+```
+
+**Human**
+```python
+def send_email(
+    to: str,
+    subject: str,
+    body: str,
+    *,
+    cc: list[str] = (),
+    bcc: list[str] = (),
+    template: str = "default",
+    retry: int = 3,
+    timeout: int = 10,
+) -> None:
+```
+
+Rule: every option a function supports must be an explicit, typed, documented parameter — an untyped `options` dict is an undocumented API.
+
+---
+
+## 11. Premature interface abstraction
+
+LLMs generate repository interfaces with two or three concrete implementations before a second real implementation exists. The abstraction costs readability and indirection without enabling anything. The `InMemoryRepository` for tests is the only "second implementation" ever written.
 
 **LLM**
 ```typescript
-function fetchReport(id: string, options: {
-    format?: "pdf" | "csv" | "json",
-    includeSummary?: boolean,
-    includeCharts?: boolean,
-    dateRange?: [Date, Date],
-    groupBy?: string,
-    filters?: Record<string, unknown>,
-    maxRows?: number,
-    timeout?: number,
-    cache?: boolean,
-    cacheKey?: string,
-    retry?: boolean,
-    retryCount?: number,
-    onProgress?: (pct: number) => void,
-    signal?: AbortSignal,
-    locale?: string,
-} = {}): Promise<Report>
+interface UserRepository {
+    findById(id: string): Promise<User>;
+    findByEmail(email: string): Promise<User | null>;
+    save(user: User): Promise<void>;
+    delete(id: string): Promise<void>;
+}
+
+class PostgresUserRepository implements UserRepository { ... }
+class MongoUserRepository implements UserRepository { ... }  // never used
+class InMemoryUserRepository implements UserRepository { ... }  // tests only
 ```
 
 **Human**
 ```typescript
-function fetchReport(id: string, format: ReportFormat): Promise<Report>
-function fetchReportWithFilters(id: string, query: ReportQuery): Promise<Report>
+// Direct functions until a second real storage backend exists
+async function findUser(id: string): Promise<User> { ... }
+async function saveUser(user: User): Promise<void> { ... }
 ```
 
-Rule: an options bag with fifteen optional keys is not one function, it is fifteen functions that share an implementation. Each key adds a code path. Design for the primary use case. If secondary use cases exist, expose them through additional functions with honest signatures.
+Rule: introduce an interface when a second real implementation exists, not in anticipation of one — functions compose more easily than classes and require no ceremony.
 
 ---
 
-Human API design follows the principle of least surprise: calling code should read naturally, the common case should be the easy case, and errors should be impossible to ignore. When an API requires reading the implementation to use it correctly, the API has failed. Names, types, and signatures are the documentation.
+## 12. `{ success: boolean, data: T, error: string }` return unions
+
+LLMs avoid exceptions by returning success objects. Every caller must check `result.success` before using `result.data`. The pattern spreads defensive null-checking throughout the codebase and makes it impossible to compose operations without unwrapping at each step.
+
+**LLM**
+```typescript
+function createUser(email: string): { success: boolean; data?: User; error?: string } {
+    try {
+        const user = db.users.create(email);
+        return { success: true, data: user };
+    } catch (e) {
+        return { success: false, error: String(e) };
+    }
+}
+```
+
+**Human**
+```typescript
+function createUser(email: string): User {
+    return db.users.create(email);  // throws on failure
+}
+
+// Or, if the codebase uses Result consistently:
+function createUser(email: string): Result<User, DuplicateEmail | InvalidEmail> {
+```
+
+Rule: throw on failure in languages that support exceptions; use a typed `Result` if the codebase has one — never return ad hoc `{ success, data, error }` objects.
+
+---
+
+## 13. Every function returns a detailed response object
+
+LLMs return metadata from operations that should return nothing or just the created entity. A function that deletes a record returns a confirmation object. The caller must inspect a response to know if a side effect occurred.
+
+**LLM**
+```python
+def delete_user(user_id: str) -> dict:
+    user = db.users.find(user_id)
+    db.users.delete(user_id)
+    return {
+        "success": True,
+        "message": "User deleted successfully",
+        "deleted_at": datetime.utcnow().isoformat(),
+        "user_id": user_id,
+    }
+```
+
+**Human**
+```python
+def delete_user(user_id: str) -> None:
+    db.users.delete(user_id)  # raises UserNotFound if absent
+```
+
+Rule: return `None` from mutation functions that succeed; raise on failure — callers who need the deletion timestamp can record it themselves.
+
+---
+
+## 14. Callback parameters that should be events or promises
+
+LLMs wire callbacks into function signatures when the operation is asynchronous or has side effects. Callbacks invert control without providing the composability of promises or the decoupling of events.
+
+**LLM**
+```python
+def process_file(
+    path: str,
+    on_success: Callable[[Result], None],
+    on_error: Callable[[Exception], None],
+    on_progress: Callable[[float], None],
+) -> None:
+```
+
+**Human**
+```python
+async def process_file(path: str) -> Result:
+    ...  # raises on failure; caller awaits and handles errors
+```
+
+Rule: return a promise or raise an exception; pass a callback only when the operation has multiple intermediate events that cannot be represented by a single return value.
+
+---
+
+## 15. The unnecessary wrapper class
+
+LLMs create utility classes as containers for static methods: `StringUtils`, `MathUtils`, `DateHelper`, `ValidationUtils`. These are namespaced functions pretending to be objects. They cannot be instantiated meaningfully and add a class hierarchy that serves no purpose.
+
+**LLM**
+```python
+class StringUtils:
+    @staticmethod
+    def slugify(text: str) -> str: ...
+
+    @staticmethod
+    def truncate(text: str, max_len: int) -> str: ...
+
+class MathUtils:
+    @staticmethod
+    def clamp(value: float, min_val: float, max_val: float) -> float: ...
+```
+
+**Human**
+```python
+# strings.py
+def slugify(text: str) -> str: ...
+def truncate(text: str, max_len: int) -> str: ...
+
+# math.py
+def clamp(value: float, min_val: float, max_val: float) -> float: ...
+```
+
+Rule: use module-level functions — modules are namespaces; classes are for objects with state and behavior.
+
+---
+
+## 16. APIs designed for the code review, not the caller
+
+LLMs produce APIs that look thorough: symmetrical methods, comprehensive parameters, consistent naming, exhaustive `__all__` exports. The surface area is large and appears professional. Callers must read the entire interface to accomplish one task.
+
+**LLM**
+```python
+__all__ = [
+    "create_user", "read_user", "update_user", "delete_user",
+    "create_session", "read_session", "delete_session",
+    "create_token", "validate_token", "revoke_token",
+    "UserService", "SessionService", "TokenService",
+    "UserRepository", "SessionRepository",
+]
+```
+
+**Human**
+```python
+__all__ = ["register_user", "login", "logout"]
+# Everything else is an implementation detail
+```
+
+Rule: export only what callers need — a large `__all__` is a sign that the module boundary is in the wrong place.
+
+---
+
+## 17. Parameter names that encode the type
+
+LLMs name parameters with their type embedded: `userObject`, `configDict`, `itemsList`, `callbackFunction`. This is redundant in typed languages and a readability problem in all languages. It encodes the implementation, not the role.
+
+**LLM**
+```python
+def process(userObject: User, configDict: dict, itemsList: list[Item]) -> ResultObject:
+```
+
+**Human**
+```python
+def process(user: User, config: Config, items: list[Item]) -> Result:
+```
+
+Rule: name parameters after their role or domain concept, not their type — the type annotation already carries that information.
+
+---
+
+Human APIs are asymmetric: they start with the caller's most common need and build outward only when forced by a second real use case. When an LLM designs an API, it starts with a complete surface; when a human designs one, they start with one working call path and let real use cases drive the rest.

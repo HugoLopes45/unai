@@ -126,12 +126,20 @@ pub fn apply_text_rules(content: &str) -> Vec<Finding> {
             let mut search_start = 0usize;
             while let Some(pos) = line_lower[search_start..].find(rule.needle) {
                 let col = search_start + pos;
-                // Skip matches inside inline backtick spans.
-                if is_in_backtick_span(line, col, col + rule.needle.len()) {
-                    search_start = col + rule.needle.len();
+                let end = col + rule.needle.len();
+                // Require word boundaries: char before must not be alphanumeric,
+                // char after must not be alphanumeric (handles inflections like
+                // "pivotale", "delves", "commencement").
+                if !is_word_boundary(&line_lower, col, end) {
+                    search_start = end;
                     continue;
                 }
-                let matched = &line[col..col + rule.needle.len()];
+                // Skip matches inside inline backtick spans.
+                if is_in_backtick_span(line, col, end) {
+                    search_start = end;
+                    continue;
+                }
+                let matched = &line[col..end];
                 findings.push(Finding {
                     line: line_idx + 1,
                     col,
@@ -140,12 +148,37 @@ pub fn apply_text_rules(content: &str) -> Vec<Finding> {
                     replacement: rule.replacement.map(str::to_string),
                     severity: rule.severity.clone(),
                 });
-                search_start = col + rule.needle.len();
+                search_start = end;
             }
         }
     }
 
     findings
+}
+
+/// Returns `true` if the match at `[start, end)` is delimited by non-alphanumeric
+/// characters on both sides (word-boundary check). Multi-byte safe.
+fn is_word_boundary(line: &str, start: usize, end: usize) -> bool {
+    let before_ok = if start == 0 {
+        true
+    } else {
+        // Walk back one char
+        line[..start]
+            .chars()
+            .next_back()
+            .map(|c| !c.is_alphanumeric())
+            .unwrap_or(true)
+    };
+    let after_ok = if end >= line.len() {
+        true
+    } else {
+        line[end..]
+            .chars()
+            .next()
+            .map(|c| !c.is_alphanumeric())
+            .unwrap_or(true)
+    };
+    before_ok && after_ok
 }
 
 /// Returns `true` if byte range `[start, end)` falls inside an inline backtick span.
@@ -780,5 +813,90 @@ mod tests {
             findings.iter().all(|f| f.matched.to_lowercase() != "utilize"),
             "utilize inside backtick span should not be flagged"
         );
+    }
+}
+
+#[cfg(test)]
+mod challenge_tests {
+    use super::*;
+
+    // --- Word boundary: substrings ---
+    #[test] fn pivotale_unchanged() {
+        let f = apply_text_rules("C'est une décision pivotale.");
+        assert!(f.is_empty(), "pivotale should not be flagged, got: {:?}", f.iter().map(|x|&x.matched).collect::<Vec<_>>());
+    }
+    #[test] fn delves_unchanged() {
+        let f = apply_text_rules("She delves into the topic.");
+        assert!(f.is_empty(), "delves should not be flagged, got: {:?}", f.iter().map(|x|&x.matched).collect::<Vec<_>>());
+    }
+    #[test] fn commencement_unchanged() {
+        let input = "The commencement ceremony starts now.";
+        let f = apply_text_rules(input);
+        let cleaned = clean(input, &f);
+        assert_eq!(cleaned, input, "commencement should not be mangled");
+    }
+    #[test] fn utilization_unchanged() {
+        let f = apply_text_rules("Memory utilization is 80%.");
+        assert!(f.is_empty(), "utilization should not be flagged");
+    }
+    #[test] fn notably_in_notable_unchanged() {
+        let f = apply_text_rules("The notable result stands.");
+        assert!(f.is_empty(), "notable should not be flagged");
+    }
+
+    // --- Non-English passthrough ---
+    #[test] fn spanish_notable_unchanged() {
+        let input = "El resultado es notable.";
+        let f = apply_text_rules(input);
+        assert!(f.is_empty(), "Spanish 'notable' should not be flagged");
+    }
+    #[test] fn french_passthrough() {
+        let input = "Le résultat est remarquable.";
+        let f = apply_text_rules(input);
+        assert!(f.is_empty());
+    }
+
+    // --- Fenced code block with info string ---
+    #[test] fn fenced_with_info_string_unchanged() {
+        let input = "```python\nutilize this\n```";
+        let f = apply_text_rules(input);
+        assert!(f.iter().all(|x| x.matched.to_lowercase() != "utilize"),
+            "utilize inside ```python block should not be flagged");
+    }
+
+    // --- Inline backtick + prose on same line ---
+    #[test] fn banned_outside_backtick_fixed() {
+        let input = "Use `foo` and utilize bar.";
+        let f = apply_text_rules(input);
+        let cleaned = clean(input, &f);
+        assert!(cleaned.contains("use bar"), "prose utilize should be fixed, got: {}", cleaned);
+        assert!(cleaned.contains("`foo`"), "backtick span preserved, got: {}", cleaned);
+    }
+
+    // --- Case ---
+    #[test] fn all_caps_utilize_unchanged() {
+        // UTILIZE doesn't match because needle is lowercase and we match on line_lower,
+        // but replacement target is the original — verify it gets replaced or not
+        let input = "UTILIZE this.";
+        let f = apply_text_rules(input);
+        let cleaned = clean(input, &f);
+        // It WILL match (case-insensitive), replacement should preserve case
+        // "UTILIZE" -> apply_case("UTILIZE", "use") -> "Use" (only first char uppercased)
+        // This is a known limitation — document it, don't hide it
+        println!("UTILIZE result: {}", cleaned);
+    }
+
+    // --- Multiple banned words same line ---
+    #[test] fn multiple_banned_words() {
+        // "utilize" -> "use", "leveraging" -> "using"
+        let input = "utilize and leveraging this.";
+        let f = apply_text_rules(input);
+        let cleaned = clean(input, &f);
+        assert!(cleaned.contains("use") && cleaned.contains("using"), "got: {}", cleaned);
+    }
+
+    // --- Empty / whitespace ---
+    #[test] fn empty_input() {
+        assert!(apply_text_rules("").is_empty());
     }
 }

@@ -86,7 +86,7 @@ cat service.py | unai --mode code --report
 unai --annotate < file.ts
 ```
 
-Text rules are word-boundary aware: `"pivotale"` (French) and `"commencement"` pass through unchanged. Content inside fenced code blocks, inline backtick spans, and bare URL lines is never flagged.
+Text rules are word-boundary aware and Unicode-safe: `"pivotale"` (French), `"pivotaler"` (German), `"这是pivotal决策"` (Chinese) all pass through unchanged — the match fires only when the banned word stands alone as a word in any script. Content inside fenced code blocks, inline backtick spans, and bare URL lines is never flagged.
 
 Works with any programming language. Code rules match comment syntax (`#`, `//`, `--`, `/* */`), naming patterns, and commit messages regardless of what language the file is written in.
 

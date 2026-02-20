@@ -1,0 +1,11 @@
+Performance optimization is mostly not where people think it is.
+
+The classic mistake: spend two weeks making an O(n log n) algorithm 30% faster when the actual bottleneck is a database query that could be cached.
+
+Profile first. This sounds obvious. People don't do it. They have a hypothesis about what's slow and they optimize that. Sometimes the hypothesis is right. Often it isn't.
+
+Memory allocation is where you actually find the interesting stuff in server applications. Not big allocations — those are easy to see. Lots of small allocations in hot paths. The garbage collector handles it fine until it doesn't, and then you're reading flame graphs at 2am.
+
+The 80/20 isn't the interesting part. The interesting part is that the 20% that matters is usually not what you'd guess without measurement. I've seen careful algorithmic work that improved benchmark numbers and made production slower because the benchmark didn't match the actual access patterns.
+
+Don't cache things until you've measured that the thing is slow enough to warrant a cache. Every cache is technical debt you might not need.

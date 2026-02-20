@@ -1,0 +1,11 @@
+I've maintained open source projects for seven years. Some things I've learned.
+
+The first contributor is the hardest to get. After that, the project gets some legitimacy and more come. Write a very explicit CONTRIBUTING.md. Most people want to help but don't know the preferred approach for something as simple as commit message format.
+
+Issues will stay open forever unless you triage them. Pick a day of the week and close what isn't actionable. "Can't reproduce on current version" is a valid close reason. So is "this is by design."
+
+Semver. People care about it more than you expect. A patch release that breaks something, even something undocumented, generates disproportionate frustration.
+
+The bus factor problem is real. If only you can merge PRs, the project slows to your personal bandwidth. Adding a co-maintainer is scary (what if they make a decision you disagree with?) and also necessary.
+
+Burnout happens. Sometimes a project needs to be archived. There's no shame in it. A clear README that says "this project is no longer maintained" is genuinely better than silence.

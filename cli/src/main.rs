@@ -10,7 +10,9 @@ use std::process;
 use clap::{Parser, ValueEnum};
 
 use detector::{detect_mode, is_commit_msg_file, Mode};
-use rules::{apply_code_rules, apply_structural_rules, apply_text_rules, clean, CodeRule, Finding, Severity};
+use rules::{
+    apply_code_rules, apply_structural_rules, apply_text_rules, clean, CodeRule, Finding, Severity,
+};
 
 // ---------------------------------------------------------------------------
 // CLI definition
@@ -133,7 +135,10 @@ fn run(args: Args) -> Result<(), String> {
                 eprintln!("unai: no findings");
             } else if fixable == 0 {
                 // Findings exist but none have auto-fixes; diff would always be empty.
-                eprintln!("unai: {} finding(s), none auto-fixable (run --report to see them)", findings.len());
+                eprintln!(
+                    "unai: {} finding(s), none auto-fixable (run --report to see them)",
+                    findings.len()
+                );
             } else {
                 eprintln!("unai: no changes");
             }
@@ -167,8 +172,8 @@ fn run(args: Args) -> Result<(), String> {
 fn read_input(file_arg: &Option<String>) -> Result<(String, Option<String>), String> {
     match file_arg {
         Some(path) => {
-            let content = fs::read_to_string(path)
-                .map_err(|e| format!("cannot read '{}': {}", path, e))?;
+            let content =
+                fs::read_to_string(path).map_err(|e| format!("cannot read '{}': {}", path, e))?;
             let filename = Path::new(path)
                 .file_name()
                 .and_then(|n| n.to_str())
@@ -259,15 +264,24 @@ fn print_output(text: &str) {
 }
 
 fn print_dry_run(content: &str, findings: &[Finding]) {
-    let fixable: Vec<&Finding> = findings.iter().filter(|f| f.replacement.is_some()).collect();
-    let unfixable: Vec<&Finding> = findings.iter().filter(|f| f.replacement.is_none()).collect();
+    let fixable: Vec<&Finding> = findings
+        .iter()
+        .filter(|f| f.replacement.is_some())
+        .collect();
+    let unfixable: Vec<&Finding> = findings
+        .iter()
+        .filter(|f| f.replacement.is_none())
+        .collect();
 
     if !fixable.is_empty() {
         eprintln!("--- Auto-fixable ({}) ---", fixable.len());
         for f in &fixable {
             let repl = f.replacement.as_deref().unwrap_or("");
             if repl.is_empty() {
-                eprintln!("  line {:>4}: [remove] {:?}  — {}", f.line, f.matched, f.message);
+                eprintln!(
+                    "  line {:>4}: [remove] {:?}  — {}",
+                    f.line, f.matched, f.message
+                );
             } else {
                 eprintln!(
                     "  line {:>4}: {:?} → {:?}  — {}",
@@ -335,10 +349,7 @@ fn print_report(findings: &[Finding], mode: &Mode) {
     ];
 
     for (label, sev) in severity_levels {
-        let group: Vec<&Finding> = findings
-            .iter()
-            .filter(|f| f.severity == *sev)
-            .collect();
+        let group: Vec<&Finding> = findings.iter().filter(|f| f.severity == *sev).collect();
 
         if group.is_empty() {
             continue;
@@ -357,12 +368,18 @@ mod tests {
 
     #[test]
     fn resolve_mode_explicit_text() {
-        assert_eq!(resolve_mode(&ModeArg::Text, None, "fn main() {}"), Mode::Text);
+        assert_eq!(
+            resolve_mode(&ModeArg::Text, None, "fn main() {}"),
+            Mode::Text
+        );
     }
 
     #[test]
     fn resolve_mode_explicit_code() {
-        assert_eq!(resolve_mode(&ModeArg::Code, None, "hello world"), Mode::Code);
+        assert_eq!(
+            resolve_mode(&ModeArg::Code, None, "hello world"),
+            Mode::Code
+        );
     }
 
     #[test]
@@ -400,26 +417,37 @@ mod tests {
         let findings = apply_text_rules(input);
         let cleaned = clean(input, &findings);
         assert!(!cleaned.contains("utilize"), "utilize should be replaced");
-        assert!(!cleaned.contains("facilitate"), "facilitate should be replaced");
+        assert!(
+            !cleaned.contains("facilitate"),
+            "facilitate should be replaced"
+        );
         assert!(cleaned.ends_with('\n'));
     }
 
     #[test]
     fn gather_findings_commit_msg_fires_commit_rules() {
         let findings = gather_findings("wip", &Mode::CommitMsg, &[], None);
-        assert!(findings.iter().any(|f| f.message.contains("Vague commit")), "commit rules should fire for CommitMsg mode");
+        assert!(
+            findings.iter().any(|f| f.message.contains("Vague commit")),
+            "commit rules should fire for CommitMsg mode"
+        );
     }
 
     #[test]
     fn gather_findings_commit_msg_fires_both_text_and_commit_rules() {
         // Both a text tell ("utilize") and a commit tell (past tense "Added") must fire
-        let findings = gather_findings("Added utilize to the codebase", &Mode::CommitMsg, &[], None);
+        let findings =
+            gather_findings("Added utilize to the codebase", &Mode::CommitMsg, &[], None);
         assert!(
-            findings.iter().any(|f| f.matched.to_lowercase().contains("utilize")),
+            findings
+                .iter()
+                .any(|f| f.matched.to_lowercase().contains("utilize")),
             "text rules should fire in CommitMsg mode"
         );
         assert!(
-            findings.iter().any(|f| f.message.contains("imperative mood")),
+            findings
+                .iter()
+                .any(|f| f.message.contains("imperative mood")),
             "commit past-tense rule should fire in CommitMsg mode"
         );
     }
@@ -433,8 +461,12 @@ mod tests {
             .filter(|f| f.severity.rank() >= min_rank)
             .collect();
         // "Certainly!" is Critical (rank 3 >= 2), "in order to" is Low (rank 0 < 2)
-        assert!(filtered.iter().any(|f| f.matched.to_lowercase() == "certainly!"));
-        assert!(!filtered.iter().any(|f| f.matched.to_lowercase() == "in order to"));
+        assert!(filtered
+            .iter()
+            .any(|f| f.matched.to_lowercase() == "certainly!"));
+        assert!(!filtered
+            .iter()
+            .any(|f| f.matched.to_lowercase() == "in order to"));
     }
 
     #[test]

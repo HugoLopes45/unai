@@ -4,7 +4,12 @@ version = "0.2.0"
 edition = "2021"
 description = "Remove LLM-isms from text and code"
 license = "MIT"
-repository = "https://github.com/username/unai"
+repository = "https://github.com/HugoLopes45/unai"
+keywords = ["linter", "ai", "style", "llm", "text"]
+categories = ["command-line-utilities", "text-processing"]
+readme = "../README.md"
+exclude = [".github/", "prompts/", "rules/", ".forge/"]
+rust-version = "1.75"
 
 [[bin]]
 name = "unai"

@@ -8,15 +8,36 @@ pub enum Mode {
 
 const CODE_EXTENSIONS: &[&str] = &[
     "py", "ts", "tsx", "js", "jsx", "rs", "go", "java", "kt", "swift", "c", "cpp", "h", "hpp",
-    "cs", "rb", "php", "sh", "bash", "zsh", "fish", "lua", "r", "scala", "hs", "ml", "ex",
-    "exs", "clj", "cljs", "dart", "nim", "zig",
+    "cs", "rb", "php", "sh", "bash", "zsh", "fish", "lua", "r", "scala", "hs", "ml", "ex", "exs",
+    "clj", "cljs", "dart", "nim", "zig",
 ];
 
 const CODE_CONTENT_SIGNALS: &[&str] = &[
-    "def ", "fn ", "func ", "function ", "class ", "import ", "from ", "use ", "mod ",
-    "const ", "let ", "var ", "type ", "interface ", "struct ", "enum ", "impl ",
-    "pub fn", "async fn", "pub struct", "pub enum", "pub trait",
-    "#include", "package ", "namespace ",
+    "def ",
+    "fn ",
+    "func ",
+    "function ",
+    "class ",
+    "import ",
+    "from ",
+    "use ",
+    "mod ",
+    "const ",
+    "let ",
+    "var ",
+    "type ",
+    "interface ",
+    "struct ",
+    "enum ",
+    "impl ",
+    "pub fn",
+    "async fn",
+    "pub struct",
+    "pub enum",
+    "pub trait",
+    "#include",
+    "package ",
+    "namespace ",
 ];
 
 pub fn detect_mode(filename: Option<&str>, content: &str) -> Mode {
@@ -100,7 +121,13 @@ mod tests {
 
     #[test]
     fn commit_msg_file_is_commit_msg() {
-        assert_eq!(detect_mode(Some("COMMIT_EDITMSG"), "feat: add thing"), Mode::CommitMsg);
-        assert_eq!(detect_mode(Some("MERGE_MSG"), "Merge branch foo"), Mode::CommitMsg);
+        assert_eq!(
+            detect_mode(Some("COMMIT_EDITMSG"), "feat: add thing"),
+            Mode::CommitMsg
+        );
+        assert_eq!(
+            detect_mode(Some("MERGE_MSG"), "Merge branch foo"),
+            Mode::CommitMsg
+        );
     }
 }

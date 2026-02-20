@@ -1,0 +1,11 @@
+Docker changed how I ship software but not always in the ways people say.
+
+The consistency thing is real. "Works on my machine" actually went away. That's valuable.
+
+The security model is fine for most things and terrifying if you think hard about it. Running containers as root by default was a choice. Not everyone notices until it matters.
+
+Image size gets out of hand fast if you're not careful. Multi-stage builds help a lot. Pinning base image versions is not optional if you care about reproducibility. I've seen "latest" break builds on a Tuesday because someone updated a base image.
+
+Orchestration is the part nobody tells you is hard upfront. Single-container Docker is easy. The moment you have two services that need to talk to each other, you're building infrastructure. This is where most people end up learning Kubernetes whether they planned to or not.
+
+My honest take: Docker is worth it. Kubernetes is worth it at scale. Between "one server" and "Kubernetes" there's a gap that's harder than either and nobody has solved it cleanly yet.

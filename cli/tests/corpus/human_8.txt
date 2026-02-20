@@ -1,0 +1,11 @@
+TypeScript is better than JavaScript for non-trivial codebases. That's the whole take.
+
+The friction cost is real and front-loaded. You spend more time upfront than you would in plain JS. You pay it back when refactoring, when you join an existing codebase, when something breaks at 3am and you're reading code you didn't write.
+
+Strict mode. Turn it on. The default settings are loose enough that you don't get most of the benefit. `noImplicitAny` and `strictNullChecks` are the important ones.
+
+The type system is structurally typed, which means it does things that feel wrong if you're coming from Java or C#. `{name: string}` is assignable to `{name: string, age: number}` in some contexts. This trips people up.
+
+Declaration files for third-party packages have gotten much better. A few years ago you'd regularly hit libraries with no types. That's mostly solved now. DefinitelyTyped covers the long tail.
+
+Don't use enums. Use `as const` instead. TypeScript enums compile to surprising output and don't behave like you'd expect in a few edge cases that you'll eventually hit.

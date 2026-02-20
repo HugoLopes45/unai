@@ -1,0 +1,7 @@
+Distributed systems are hard in ways that don't show up in textbooks. The CAP theorem is fine as a mental model but the real constraint is usually latency. You can have consistency and availability — you just can't have them at low latency when the network is slow.
+
+Spent three months last year debugging a race condition in our consensus layer. The bug was in a path we hit maybe once per million requests. Production only. Never reproduced locally. We finally caught it by adding timestamps to 47 different log statements and cross-referencing them by hand across three services.
+
+The thing about distributed bugs is they're always more embarrassing than you expect. This one was a two-line fix. The invariant we thought we were maintaining wasn't. Classic.
+
+Kubernetes is fine. People hate on it but the alternative is writing your own scheduler, and that's worse. My only real complaint is that debugging pod startup failures still requires too much kubectl archaeology.

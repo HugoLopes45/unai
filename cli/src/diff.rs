@@ -81,7 +81,12 @@ fn diff_ops(orig: &[&str], modified: &[&str], lcs: &[Vec<usize>]) -> Vec<(DiffOp
 }
 
 /// Build unified diff hunk strings with `context` lines of context.
-fn build_hunks(orig: &[&str], modified: &[&str], lcs: &[Vec<usize>], context: usize) -> Vec<String> {
+fn build_hunks(
+    orig: &[&str],
+    modified: &[&str],
+    lcs: &[Vec<usize>],
+    context: usize,
+) -> Vec<String> {
     let ops = diff_ops(orig, modified, lcs);
 
     // Find ranges of non-Equal ops, expanded by context lines
@@ -125,20 +130,24 @@ fn build_hunks(orig: &[&str], modified: &[&str], lcs: &[Vec<usize>], context: us
         let hunk_ops = &ops[ctx_start..ctx_end];
 
         // Compute orig and mod line ranges for the @@ header
-        let orig_start_line = hunk_ops.iter()
+        let orig_start_line = hunk_ops
+            .iter()
             .filter(|(op, _, _)| *op == DiffOp::Equal || *op == DiffOp::Delete)
             .map(|(_, oi, _)| *oi + 1)
             .next()
             .unwrap_or(1);
-        let orig_count = hunk_ops.iter()
+        let orig_count = hunk_ops
+            .iter()
             .filter(|(op, _, _)| *op == DiffOp::Equal || *op == DiffOp::Delete)
             .count();
-        let mod_start_line = hunk_ops.iter()
+        let mod_start_line = hunk_ops
+            .iter()
             .filter(|(op, _, _)| *op == DiffOp::Equal || *op == DiffOp::Insert)
             .map(|(_, _, mi)| *mi + 1)
             .next()
             .unwrap_or(1);
-        let mod_count = hunk_ops.iter()
+        let mod_count = hunk_ops
+            .iter()
             .filter(|(op, _, _)| *op == DiffOp::Equal || *op == DiffOp::Insert)
             .count();
 
@@ -178,7 +187,10 @@ mod tests {
         let modified = "We should use this approach.\n";
         let diff = unified_diff(orig, modified, "original", "cleaned");
         assert!(!diff.is_empty(), "diff should not be empty");
-        assert!(diff.contains("-We should utilize"), "should show removed line");
+        assert!(
+            diff.contains("-We should utilize"),
+            "should show removed line"
+        );
         assert!(diff.contains("+We should use"), "should show added line");
         assert!(diff.contains("--- original"), "should have orig header");
         assert!(diff.contains("+++ cleaned"), "should have mod header");
@@ -190,7 +202,10 @@ mod tests {
         let modified = "line 1\nline 2\nline 3\nWe should use this.\nline 5\nline 6\nline 7\n";
         let diff = unified_diff(orig, modified, "original", "cleaned");
         // Should show context lines around the change
-        assert!(diff.contains(" line 1") || diff.contains(" line 3"), "should show context lines");
+        assert!(
+            diff.contains(" line 1") || diff.contains(" line 3"),
+            "should show context lines"
+        );
     }
 
     #[test]

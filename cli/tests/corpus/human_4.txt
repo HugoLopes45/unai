@@ -1,0 +1,11 @@
+API design mistakes I've made and now try to avoid.
+
+Returning HTTP 200 for everything and encoding the error in the body. Seemed convenient. In practice, every client has to parse every response body to know if it worked. The HTTP status code is free, use it.
+
+Not versioning from day one. We had to do a v2 migration across twelve different teams. It took a year. Version your API before you have consumers, not after.
+
+Inconsistent naming is a slow tax. If some endpoints use snake_case and others use camelCase, someone will use the wrong one eventually and spend an hour debugging a 422 that says "field not found."
+
+The hardest one to explain to product: don't put behavior in GET requests. Audit logs, rate limits, caching — they all assume GET is idempotent. The moment a GET has side effects, you've broken every layer of infrastructure that assumes it doesn't.
+
+Pagination is almost always necessary and almost always added later. It's very easy to add it from the start. Just do it.

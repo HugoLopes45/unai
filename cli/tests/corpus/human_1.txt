@@ -1,0 +1,7 @@
+Machine learning is really just statistics with better marketing. I've been doing this stuff for eight years and the fundamentals haven't changed: you have data, you have a model, you have an objective function. The fancy names shift every few years but the math is the same.
+
+What actually changed with deep learning is compute. We could always write a convolutional net in 1998. We just couldn't train one on anything interesting. AlexNet in 2012 wasn't a theoretical breakthrough — GPUs got fast enough to make the theory practical.
+
+If you're just starting out, skip the hype. Pick one framework (PyTorch these days, probably), work through Andrej's lectures, and build something. Reading about gradient descent won't teach you as much as watching a loss curve not converge and figuring out why.
+
+The "AI will change everything" narrative isn't wrong exactly. But the timeline always slips. Every major advance takes longer to matter than the blog posts suggest.

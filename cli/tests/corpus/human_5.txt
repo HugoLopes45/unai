@@ -1,0 +1,11 @@
+The thing that actually made me better at databases was reading the PostgreSQL source code.
+
+Not because I needed to know how it works internally. Because reading implementation code forces you to understand the semantics precisely. You can't hold a vague mental model when you're reading the actual MVCC implementation.
+
+Indexes. Everyone knows "add an index for slow queries." Fewer people understand why a perfectly reasonable-looking query ignores a perfect index. Partial indexes, expression indexes, covering indexes — each solves a different problem. EXPLAIN ANALYZE is your friend. Read it actually.
+
+VACUUM is the part most people learn the hard way. If you're running long transactions, table bloat is real. We had a table grow to 40GB of dead tuples before someone noticed. AUTOVACUUM has opinions about what counts as urgent.
+
+Row-level security is genuinely useful when you get it right. When you get it wrong, the performance implications are non-obvious and the bugs are subtle.
+
+Don't store money as FLOAT. That's not a tip. That's a warning from experience.

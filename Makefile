@@ -1,6 +1,9 @@
-.PHONY: build install test install-skill install-cursor
+.PHONY: build install test lint fmt fmt-check release tag install-skill install-cursor
 
 build:
+	cargo build --manifest-path cli/Cargo.toml
+
+release:
 	cargo build --release --manifest-path cli/Cargo.toml
 
 install:
@@ -8,6 +11,19 @@ install:
 
 test:
 	cargo test --manifest-path cli/Cargo.toml
+
+lint:
+	cargo clippy --manifest-path cli/Cargo.toml -- -D warnings
+
+fmt:
+	cargo fmt --manifest-path cli/Cargo.toml
+
+fmt-check:
+	cargo fmt --manifest-path cli/Cargo.toml -- --check
+
+tag:
+	git tag -a v$(shell grep '^version' cli/Cargo.toml | head -1 | cut -d'"' -f2) \
+	  -m "Release v$(shell grep '^version' cli/Cargo.toml | head -1 | cut -d'"' -f2)"
 
 install-skill:
 	mkdir -p ~/.claude/skills/unai

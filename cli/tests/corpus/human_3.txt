@@ -1,0 +1,11 @@
+I've been using Rust in production for two years. Here's what I actually think.
+
+The borrow checker is annoying at first and useful eventually. The transition point is when you stop fighting it and start designing around it. That usually takes three or four real projects.
+
+The compile times are genuinely bad on big codebases. We have a service that takes four minutes for a full build. We work around it with cargo-watch and only ever do debug builds locally. Not great.
+
+Where Rust is obviously worth it: anything that touches memory directly, parsing untrusted input, anything that needs to be correct under adversarial conditions. Where it's probably not worth it: typical web services where Go or Python would be fast enough.
+
+The ecosystem is younger than it looks. Some crates are fantastic. Others are abandoned one-person projects with 80% of the API implemented. Check commit dates before adding a dependency.
+
+async Rust in particular is a mess. The concept is sound but tokio and async-std are different enough that mixing them causes real problems. Pick one.

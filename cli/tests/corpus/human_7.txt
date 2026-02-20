@@ -1,0 +1,11 @@
+React has a complexity problem it doesn't want to admit.
+
+The core idea — UI as a function of state — is sound. The implementation has accumulated enough edge cases and footguns that new React developers routinely build themselves into corners.
+
+useEffect is where this shows up most. The rules around it are learnable. The mental model required to apply them correctly is genuinely hard to internalize. I've reviewed code from people with five years of React experience who had subtle useEffect bugs.
+
+State management: React's own documentation has flip-flopped enough times that "what should I use for global state" doesn't have a stable answer. We settled on Zustand for most things. It's simple enough to reason about.
+
+Server components are a meaningful architectural shift. I'm not convinced the developer experience is there yet. The error messages when you accidentally use a client-only API in a server component are bad.
+
+The honest comparison to Vue or Svelte: React has a better job market and a worse beginner experience. If you're choosing for a new project without constraints, it's closer than the React community admits.

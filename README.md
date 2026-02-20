@@ -1,107 +1,124 @@
-# unai
+# unai — strip LLM-isms from text and code
 
-Strip LLM-isms from text and code.
+You know the style. "Certainly! Here's a comprehensive overview..." Every AI
+writes like this. Every PR comment, every generated docstring, every commit
+message that says "refactor the codebase to enhance maintainability."
 
-## Why
-
-LLMs write in a recognizable style. Overconfident. Padded. Full of words that sound
-professional but say nothing. "Leveraging", "robust", "seamlessly", "comprehensive" —
-no human writes like this unprompted.
-
-`unai` catches those patterns and flags or replaces them. Use it as a CLI filter,
-an editor rule, or a system prompt that trains LLMs to stop doing it in the first
-place.
+`unai` finds those patterns and kills them. Claude Code skill, Cursor rule,
+OpenCode prompt, Rust CLI. Works on prose, code comments, variable names,
+commit messages, docstrings, tests, error handling — wherever LLMs leave
+fingerprints.
 
 ## What it catches
 
-| Text patterns | Code patterns |
-|---|---|
-| Filler openers ("Certainly!", "Of course!") | Comments with "Note:" / "Important:" |
-| Confidence hedges ("It's worth noting") | Docstrings padded with "This function..." |
-| Vague intensifiers ("robust", "seamless") | `handleError` / `processData` naming |
-| Em-dash overuse | Smart/curly quotes in strings |
-| Bullet-point everything | Over-documented obvious code |
-| Redundant sign-offs ("I hope this helps") | Test names like `testItWorksCorrectly` |
-| Passive voice stacking | Magic `// TODO: implement` stubs |
-| Fake lists ("First... Second... Finally...") | Commit messages: "Add initial implementation" |
+| Text | Code |
+|------|------|
+| "Certainly!", "Of course!", "Great question!" | `# Initialize the counter variable to zero` |
+| "it's worth noting", "it is important to note" | `class UserDataManager` / `processUserDataObject` |
+| "robust", "seamless", "leveraging", "comprehensive" | `# TODO: add error handling` |
+| em-dash overuse — like this — everywhere — | `assert result is not None` |
+| "In conclusion", "Moreover", "Furthermore" | `def handleUserAuthenticationRequest()` |
+| "I hope this helps! Let me know if..." | `# Step 1: validate. Step 2: process.` |
+| rule of three (innovation, iteration, and insights) | past-tense commit messages |
+| "Not only X, but also Y" | `result = ...` used for every return value |
 
-Full list: [rules/](rules/)
+137 patterns across 9 rule files. [Browse them in `rules/`](rules/).
 
 ## Install
 
-### Claude Code skill
+### Claude Code
+
+```bash
+mkdir -p ~/.claude/skills/unai
+curl -sL https://raw.githubusercontent.com/HugoLopes45/unai/main/prompts/claude-code.md \
+  > ~/.claude/skills/unai/SKILL.md
+```
+
+Then `/unai` in any session.
+
+Or if you cloned the repo:
 
 ```bash
 make install-skill
 ```
 
-Then use `/unai` in any Claude Code session.
-
-### Cursor rule
+### Cursor
 
 ```bash
 make install-cursor
 ```
 
-Or copy `prompts/cursor.mdc` to `.cursor/rules/unai.mdc` in your project.
+Copies `prompts/cursor.mdc` to `.cursor/rules/unai.mdc` in the current project.
 
 ### OpenCode
 
-Add `prompts/opencode.md` as a system prompt in your OpenCode config.
+Add `prompts/opencode.md` as a rule in your OpenCode config.
 
-### Any LLM (system prompt)
+### Any LLM (ChatGPT, Gemini, API)
 
-Copy the contents of `prompts/system-prompt.md` into your LLM's system prompt field.
-Works with ChatGPT, Gemini, any OpenAI-compatible API.
+Copy `prompts/system-prompt.md` into the system prompt field. That's it.
 
-### CLI
+### CLI (Rust)
 
 ```bash
 cargo install --path cli/
 ```
 
-Requires Rust 1.75+.
-
-## Usage
+Requires Rust 1.75+. Then:
 
 ```bash
-# Pipe text through unai
-echo "Certainly! Here's a comprehensive solution..." | unai
+# pipe anything through it
+echo "Certainly! Here's a thorough breakdown..." | unai
 
-# Filter a file
-unai < response.md
+# check a file
+unai response.md
 
-# Fix mode — apply replacements instead of flagging
-unai --fix < response.md
+# report mode — see what's wrong without changing it
+unai --report < draft.md
 
-# Check a specific category only
-unai --only text < response.md
-unai --only comments < file.rs
+# code mode — flag naming, comments, docstrings
+cat service.py | unai --mode code --report
 
-# Output as JSON (for editor integrations)
-unai --json < response.md
+# annotate mode — marks each finding inline
+unai --annotate < file.ts
 ```
 
-## Rules reference
+## Why this exists
 
-Rules live in [`rules/`](rules/). Each file documents patterns with before/after examples.
-Categories:
+LLMs generate the statistical median of "correct writing." That median is padded,
+over-hedged, and full of words that sound confident while saying nothing.
 
-- [`rules/text.md`](rules/text.md) — 24 prose LLM-isms
-- [`rules/code-comments.md`](rules/code-comments.md) — comment patterns
-- [`rules/naming.md`](rules/naming.md) — identifier naming
-- [`rules/commits.md`](rules/commits.md) — commit message patterns
-- [`rules/docstrings.md`](rules/docstrings.md) — docstring padding
-- [`rules/tests.md`](rules/tests.md) — test naming and structure
-- [`rules/error-handling.md`](rules/error-handling.md) — error message patterns
-- [`rules/api-design.md`](rules/api-design.md) — API design anti-patterns
-- [`rules/llm-tells.md`](rules/llm-tells.md) — 16 unique AI fingerprints
+The patterns are predictable because they come from the same training data.
+"Leveraging" because business writing uses it. "Furthermore" because academic
+papers use it. The rule of three because rhetoric textbooks say three things sound
+complete.
+
+None of it is wrong, exactly. It just doesn't sound like a person wrote it.
+A person would say "using" instead of "leveraging." A person's code comment
+would say "don't touch this — it works and I have no idea why" instead of
+"# This function serves as the core processing handler for user data operations."
+
+## Rules
+
+Nine files, 137 patterns. Each has a before/after and a one-line fix rule.
+
+- [`rules/text.md`](rules/text.md) — 24 prose patterns (Wikipedia Signs of AI Writing)
+- [`rules/code-comments.md`](rules/code-comments.md) — 18 comment patterns
+- [`rules/naming.md`](rules/naming.md) — 14 naming patterns
+- [`rules/commits.md`](rules/commits.md) — 10 commit message patterns
+- [`rules/docstrings.md`](rules/docstrings.md) — 8 docstring patterns
+- [`rules/tests.md`](rules/tests.md) — 15 test patterns
+- [`rules/error-handling.md`](rules/error-handling.md) — 15 error handling patterns
+- [`rules/api-design.md`](rules/api-design.md) — 17 API design patterns
+- [`rules/llm-tells.md`](rules/llm-tells.md) — 16 fingerprints unique to LLMs
 
 ## Contributing
 
-Open an issue using the [new rule template](.github/ISSUE_TEMPLATE/new-rule.md),
-or add a TOML entry to the relevant file in `rules/` and open a PR.
+Open an issue with the [new rule template](.github/ISSUE_TEMPLATE/new-rule.md)
+before writing code. Rules that already exist or that are too subjective get closed.
+
+The bar: if a human developer would write it unprompted, it's not an LLM-ism.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT.

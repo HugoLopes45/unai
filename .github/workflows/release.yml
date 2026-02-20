@@ -94,7 +94,7 @@ jobs:
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-binaries, publish-crate]
+    needs: build-binaries
     permissions:
       contents: write
 

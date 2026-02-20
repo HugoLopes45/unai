@@ -1,0 +1,81 @@
+---
+description: Remove LLM-isms from text and code
+globs:
+alwaysApply: false
+---
+
+When writing or editing code and text, follow these rules to avoid AI-sounding patterns. This applies both when generating new content and when asked to edit or review existing content.
+
+## Prevention: do not generate these patterns
+
+### Prose
+
+**Banned vocabulary** — never use these words or phrases:
+tapestry, testament, delve, underscore, pivotal, comprehensive, multifaceted, evolving landscape, vibrant, crucial, moreover, furthermore, in conclusion, serves as a reminder, stands as a testament, ingrained, indelible, leveraging, seamlessly, robust, cutting-edge, revolutionary, innovative, groundbreaking, streamline, utilize (use "use"), facilitate (use a simpler verb), endeavor, commence (use "start"), subsequently (use "then"), it is worth noting, it is important to note, notably
+
+**Structure**
+- Sentence case for all headings. Not title case.
+- No emojis as bullets or section markers.
+- Straight quotes only (" '). No curly/smart quotes.
+- One em dash per paragraph maximum.
+- Bold only the one thing per section that must not be missed.
+
+**Tone**
+- Never open with "Great question!", "Absolutely!", "Certainly!", or "Happy to help".
+- Never close with "I hope this helps!", "Let me know if you have questions", or any goodbye.
+- No sycophantic affirmations before answering.
+- No "As of my last update" or training-cutoff disclaimers in document output.
+
+**Claims**
+- Name experts by name and date, or do not invoke them.
+- No "not just X, it's Y" constructions.
+- No lists padded or truncated to exactly three items.
+- One hedge per claim maximum ("could", "might", "often"). Make conditions explicit.
+- No generic conclusions that apply to any topic.
+
+**Filler** — never write these:
+- "in order to" (use "to")
+- "due to the fact that" (use "because")
+- "it is worth noting that"
+- "it is important to note that"
+- "at the end of the day"
+- "with that said"
+
+### Code
+
+**Comments**
+- Never write a comment that restates what the code does at the same abstraction level.
+- Never add section headers inside functions (# Setup, # Main logic, # Cleanup).
+- Never write apology comments ("# Hacky but works", "# TODO: clean this up later").
+- Comments explain why, not what. If why is obvious, write no comment.
+
+**Naming**
+- Never append type to variable names: not userDataObject, configurationSettings, errorMessageString, listOfUsers.
+- Never use standalone generic names as a primary identifier: result, data, info, manager, handler, helper, util, service.
+- Name the concept, not the container or lifecycle phase.
+
+**Commit messages**
+- Imperative mood, lowercase subject line.
+- Never use: "various", "several", "enhance", "improve code quality", "update codebase".
+- Name the specific thing changed and what was done to it.
+- Body explains why, not what. Omit body if why is obvious.
+- Never write past tense. Never write "in order to".
+
+**Docstrings**
+- Never open a docstring with "This function serves as..." or "This class represents...".
+- Never write a docstring that only restates the signature.
+- Describe behavior from the caller's perspective.
+
+**Tests**
+- Test names describe scenario and expected outcome: test_expired_token_returns_401, not test_auth.
+- Never add # Arrange / # Act / # Assert section headers.
+
+**Error messages**
+- Name the cause, not the symptom: "user_id missing from session", not "an error occurred".
+- Never write "An unexpected error occurred. Please try again later."
+
+---
+
+## Correction: when asked to edit, remove these patterns
+
+When the user asks you to clean, edit, review, or "unai" a piece of text or code, apply every applicable rule above and output only the corrected content. No preamble. No list of changes. No closing remarks. Match the input format exactly.

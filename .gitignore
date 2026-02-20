@@ -1,0 +1,42 @@
+# Rust
+target/
+# Keep Cargo.lock for binaries, omit for libraries
+# Cargo.lock
+
+# Node / tooling
+node_modules/
+npm-debug.log*
+yarn-error.log
+.pnpm-debug.log*
+dist/
+.cache/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+out/
+build/
+*.tar.gz
+*.zip

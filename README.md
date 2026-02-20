@@ -1,29 +1,55 @@
-# unai — strip AI writing patterns from text and code
+# unai — humanize AI-generated text and code
 
-You know it when you read it.
-
-> "Certainly! Here's a comprehensive overview of the key considerations..."
-> "It is worth noting that this pivotal approach leverages robust methodologies."
-> "Added authentication feature to enhance security of the application."
-
-Every AI assistant writes like this. The patterns are baked in by RLHF — human raters
-reward formal-sounding text, so models overfit to words like *delve*, *meticulous*,
-*leveraging*, and openers like *Certainly!*
-
-`unai` is a CLI linter that flags and auto-fixes those patterns. Pipe text through it,
-check files, or drop it in a git hook. Works on prose, code comments, commit messages,
-docstrings, variable names — anything LLMs touch.
+AI writes like AI. unai fixes that.
 
 ```bash
 $ echo "Certainly! Let me delve into this comprehensive topic." | unai
 Let me explore this thorough topic.
 ```
 
+You know the patterns when you read them: *Certainly!*, *leveraging*, *delve*, *meticulous*,
+*it is worth noting*. Every model writes this way. RLHF bakes it in — human raters reward
+formal-sounding output, so models overfit to a vocabulary that sounds polished but reads robotic.
+
+`unai` is a **CLI humanizer for AI text and code**. It strips those patterns out, replaces
+what it can automatically, and flags the rest. Pipe it into your workflow and your output
+reads like a person wrote it — not a chatbot trying to sound helpful.
+
+Unlike web-based AI humanizers, unai is **deterministic**: same input, same output, every time.
+No cloud. No API calls. No model in the loop. Just regex rules grounded in corpus data, fast
+enough to run on every keystroke.
+
+---
+
+## What it humanizes
+
+| Input | Mode | What gets cleaned |
+|-------|------|-------------------|
+| Blog posts, docs, emails | Text | Openers, filler words, hedges, clichés |
+| Source code | Code | Comments, variable names, docstrings, test boilerplate |
+| Git commit messages | Commit | Past tense, vague subjects, bloated bodies |
+
+Everything in one binary. No config files. No dependencies.
+
 ---
 
 ## Install
 
-### From crates.io (recommended)
+### Prebuilt binary (fastest)
+
+Download from [GitHub Releases](https://github.com/HugoLopes45/unai/releases/latest):
+
+| Platform | File |
+|----------|------|
+| Linux x86_64 | `unai-v*-x86_64-unknown-linux-gnu.tar.gz` |
+| Linux arm64 | `unai-v*-aarch64-unknown-linux-gnu.tar.gz` |
+| macOS x86_64 | `unai-v*-x86_64-apple-darwin.tar.gz` |
+| macOS arm64 (M1/M2/M3) | `unai-v*-aarch64-apple-darwin.tar.gz` |
+| Windows | `unai-v*-x86_64-pc-windows-msvc.zip` |
+
+Extract and put `unai` anywhere in your `$PATH`.
+
+### From crates.io
 
 ```bash
 cargo install unai
@@ -31,7 +57,7 @@ cargo install unai
 
 Requires Rust 1.75+. The binary ends up at `~/.cargo/bin/unai`.
 
-No Rust installed? One line gets it:
+No Rust? One line:
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
@@ -54,7 +80,7 @@ curl -sL https://raw.githubusercontent.com/HugoLopes45/unai/main/prompts/claude-
   > ~/.claude/skills/unai/SKILL.md
 ```
 
-Type `/unai` in any Claude Code session. It applies the rules to the current file or selection.
+Type `/unai` in any Claude Code session to humanize the current file or selection.
 
 Or from the repo: `make install-skill`
 
@@ -64,7 +90,7 @@ Or from the repo: `make install-skill`
 make install-cursor   # copies prompts/cursor.mdc → .cursor/rules/unai.mdc
 ```
 
-Cursor picks up the rules automatically on every generation in that project.
+Cursor picks up the rules on every generation in that project.
 
 ### Any LLM (ChatGPT, Gemini, API)
 
@@ -72,31 +98,16 @@ Copy `prompts/system-prompt.md` into your system prompt. Done.
 
 ---
 
-## How it works
-
-`unai` reads from a file or stdin, applies pattern rules, and writes the cleaned text to stdout.
-Diagnostics go to stderr so they don't pollute pipes.
-
-Three rule sets run depending on the input:
-
-- **Text mode** — prose patterns: sycophantic openers, LLM filler words, chatbot closers, structural tells
-- **Code mode** — code patterns: comment boilerplate, anemic naming, docstring bloat, test anti-patterns
-- **Commit mode** — triggered automatically on `COMMIT_EDITMSG` / `MERGE_MSG`: past-tense subjects, vague messages, over-long bodies
-
-Mode is detected automatically from the filename and content. You can override it with `--mode text` or `--mode code`.
-
----
-
 ## Usage
 
-### The basic case — clean and move on
+### Clean text and move on
 
 ```bash
-# pipe text through unai, get clean text back
+# pipe through unai, get humanized text back
 echo "Certainly! We should utilize this approach." | unai
 # → "We should use this approach."
 
-# clean a file
+# humanize a file
 unai draft.md > draft-clean.md
 
 # overwrite in place
@@ -108,13 +119,12 @@ Use `--report` to see what was flagged but couldn't be auto-fixed.
 
 ### `--report` — what's wrong and why
 
-Nothing gets changed. `unai` just tells you what it found and cites the source.
+Inspect findings without changing anything. Every finding cites the corpus study that measured it.
 
 ```bash
 unai --report draft.md
-unai --report < draft.md
 
-# cut the noise — only High and Critical
+# high-priority only
 unai --report --min-severity high draft.md
 ```
 
@@ -141,13 +151,10 @@ LOW (3)
   line 3: LLM connector: 'in conclusion' (Rosenfeld 2024)
 ```
 
-Every finding links back to the corpus study that measured the excess frequency. Not vibes — data.
-
 ### `--diff` — preview changes before applying them
 
 ```bash
 unai --diff draft.md
-unai --diff < draft.md
 ```
 
 ```diff
@@ -161,10 +168,10 @@ unai --diff < draft.md
  In conclusion, this innovative solution stands as a testament to meticulous engineering.
 ```
 
-Patterns without an auto-fix (like `meticulous`, `innovative`) won't show in the diff —
-they only appear in `--report`. Run both to see the full picture.
+Patterns without an auto-fix (like `meticulous`, `innovative`) won't show in the diff.
+Run `--report` alongside to see the full picture.
 
-### `--dry-run` — list every change before committing
+### `--dry-run` — list every change before applying
 
 ```bash
 unai --dry-run draft.md
@@ -182,7 +189,7 @@ unai --dry-run draft.md
   line  6: "innovative"  — LLM filler: 'innovative' (Kobak 2025, lower ratio)
 ```
 
-Original text is printed unchanged after the list — safe to pipe elsewhere.
+Original text prints unchanged after the list — safe to pipe elsewhere.
 
 ### `--annotate` — mark findings inline
 
@@ -190,16 +197,16 @@ Original text is printed unchanged after the list — safe to pipe elsewhere.
 unai --annotate draft.md
 ```
 
-Prints each line of the original, with finding markers on stderr at the exact column.
-Good for quickly spotting where the problems are in a longer document.
+Prints each line, with finding markers at the exact column on stderr.
+Good for spotting where the patterns cluster in a longer document.
 
-### Code mode
+### Humanize code
 
 ```bash
 # explicit code mode
 unai --mode code --report service.py
 
-# only flag naming and comments (skip the rest)
+# only flag naming and comments
 unai --mode code --rules naming,comments --report service.ts
 
 # docstrings only
@@ -208,10 +215,9 @@ unai --mode code --rules docstrings --report api.go
 
 Available `--rules` values: `comments`, `naming`, `commits`, `docstrings`, `tests`, `errors`, `api`
 
-**What code mode catches:**
+**Before:**
 
 ```python
-# Before
 def getUserDataObject(userDataObject):
     # This function serves as the core handler for processing user data
     # Initialize the result variable to store the output
@@ -219,21 +225,23 @@ def getUserDataObject(userDataObject):
     return result
 ```
 
+**Findings:**
+
 ```
 HIGH   line 2: LLM docstring boilerplate: 'this function serves as'
 MEDIUM line 1: Type-in-name anti-pattern: use 'user' instead of 'userDataObject'
 LOW    line 3: Over-explaining comment: states what the code already shows
 ```
 
-### Commit message mode
+### Humanize commit messages
 
-`unai` fires commit-specific rules automatically when the filename is `COMMIT_EDITMSG` or `MERGE_MSG`.
+unai fires commit-specific rules automatically on `COMMIT_EDITMSG` and `MERGE_MSG` files.
 
 ```bash
-# check a commit message file directly
+# check a commit message
 unai --report COMMIT_EDITMSG
 
-# or pipe one through
+# pipe one through
 echo "Added new authentication feature" | unai --mode code --rules commits --report
 # HIGH: Past tense in commit subject — use imperative mood ('add' not 'added')
 ```
@@ -270,7 +278,7 @@ Drop unai into your commit flow and catch LLM-isms before they land.
 unai --mode code --rules commits --report --min-severity high "$1"
 ```
 
-**Blocking (reject if findings exist):**
+**Blocking (reject bad commit messages):**
 
 ```bash
 # .git/hooks/commit-msg
@@ -324,7 +332,36 @@ chmod +x .git/hooks/commit-msg
 - Content inside fenced code blocks in Markdown (` ``` ` fences)
 - Inline backtick spans (`` `code` ``)
 - Bare URL lines
-- Non-English text: `"pivotale"` (French), `"pivotaler"` (German), `"这是pivotal决策"` (Chinese) — word-boundary matching is Unicode-safe, so foreign words that contain an English banned word as a substring pass through unchanged
+- Non-English text: `"pivotale"` (French), `"pivotaler"` (German), `"这是pivotal决策"` (Chinese) — word-boundary matching is Unicode-safe, so foreign words containing an English flagged word pass through unchanged
+
+---
+
+## Why a CLI, not a web app
+
+Most AI text humanizers are web apps: you paste text, a model rewrites it, you copy the output.
+That works for one-off documents. It breaks for everything else.
+
+unai is a **Unix filter**. It composes:
+
+```bash
+# humanize every markdown file in a repo
+find . -name "*.md" | xargs -I{} sh -c 'unai {} | sponge {}'
+
+# gate a CI pipeline on AI writing quality
+unai --report --min-severity high release-notes.md || exit 1
+
+# pre-commit hook that blocks AI-written commit messages
+unai --mode code --rules commits --report COMMIT_EDITMSG
+
+# integrate into your editor's format-on-save
+unai % | sponge %
+```
+
+Other humanizers can't do any of this. They're also non-deterministic: the same sentence
+in, different output each run. unai gives you the same result every time — which means you
+can review diffs, write tests, and trust it in automation.
+
+**Zero dependencies.** No Python runtime. No Node. No Docker. One static binary, ~2MB.
 
 ---
 

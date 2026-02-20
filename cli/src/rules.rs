@@ -47,53 +47,123 @@ struct TextRule {
 }
 
 const TEXT_RULES: &[TextRule] = &[
-    // Banned LLM buzzwords — High
-    TextRule { needle: "tapestry", message: "LLM filler: 'tapestry'", replacement: None, severity: Severity::High },
-    TextRule { needle: "testament", message: "LLM filler: 'testament'", replacement: None, severity: Severity::High },
-    TextRule { needle: "stands as a testament", message: "LLM filler: 'stands as a testament'", replacement: None, severity: Severity::High },
-    TextRule { needle: "delve", message: "LLM filler: 'delve'", replacement: Some("explore"), severity: Severity::High },
-    TextRule { needle: "pivotal", message: "LLM filler: 'pivotal'", replacement: Some("key"), severity: Severity::High },
-    TextRule { needle: "comprehensive", message: "LLM filler: 'comprehensive'", replacement: Some("thorough"), severity: Severity::High },
-    TextRule { needle: "multifaceted", message: "LLM filler: 'multifaceted'", replacement: None, severity: Severity::High },
-    TextRule { needle: "evolving landscape", message: "LLM cliché: 'evolving landscape'", replacement: None, severity: Severity::High },
-    TextRule { needle: "vibrant", message: "LLM filler: 'vibrant'", replacement: None, severity: Severity::High },
-    TextRule { needle: "crucial", message: "LLM filler: 'crucial'", replacement: Some("important"), severity: Severity::High },
-    TextRule { needle: "ingrained", message: "LLM filler: 'ingrained'", replacement: None, severity: Severity::High },
-    TextRule { needle: "indelible", message: "LLM filler: 'indelible'", replacement: None, severity: Severity::High },
-    TextRule { needle: "leveraging", message: "LLM filler: 'leveraging'", replacement: Some("using"), severity: Severity::High },
-    TextRule { needle: "seamlessly", message: "LLM filler: 'seamlessly'", replacement: None, severity: Severity::High },
-    TextRule { needle: "robust", message: "LLM filler: 'robust'", replacement: None, severity: Severity::High },
-    TextRule { needle: "cutting-edge", message: "LLM filler: 'cutting-edge'", replacement: None, severity: Severity::High },
-    TextRule { needle: "revolutionary", message: "LLM filler: 'revolutionary'", replacement: None, severity: Severity::High },
-    TextRule { needle: "innovative", message: "LLM filler: 'innovative'", replacement: None, severity: Severity::High },
-    TextRule { needle: "groundbreaking", message: "LLM filler: 'groundbreaking'", replacement: None, severity: Severity::High },
-    TextRule { needle: "streamline", message: "LLM filler: 'streamline'", replacement: None, severity: Severity::High },
-    TextRule { needle: "utilize", message: "LLM filler: 'utilize'", replacement: Some("use"), severity: Severity::High },
-    TextRule { needle: "facilitate", message: "LLM filler: 'facilitate'", replacement: Some("help"), severity: Severity::High },
-    TextRule { needle: "endeavor", message: "LLM filler: 'endeavor'", replacement: Some("try"), severity: Severity::High },
-    TextRule { needle: "commence", message: "LLM filler: 'commence'", replacement: Some("start"), severity: Severity::High },
-    TextRule { needle: "subsequently", message: "LLM filler: 'subsequently'", replacement: Some("then"), severity: Severity::High },
-    TextRule { needle: "notably", message: "LLM filler: 'notably'", replacement: None, severity: Severity::High },
-    // Filler connectors and hedging — Medium
-    TextRule { needle: "moreover", message: "LLM filler: 'moreover'", replacement: None, severity: Severity::Medium },
-    TextRule { needle: "furthermore", message: "LLM filler: 'furthermore'", replacement: None, severity: Severity::Medium },
-    TextRule { needle: "in conclusion", message: "LLM filler: 'in conclusion'", replacement: None, severity: Severity::Medium },
-    TextRule { needle: "serves as a reminder", message: "LLM filler: 'serves as a reminder'", replacement: None, severity: Severity::Medium },
-    TextRule { needle: "it is worth noting", message: "LLM hedge: 'it is worth noting'", replacement: None, severity: Severity::Medium },
-    TextRule { needle: "it is important to note", message: "LLM hedge: 'it is important to note'", replacement: None, severity: Severity::Medium },
-    TextRule { needle: "could potentially", message: "Hedging: 'could potentially'", replacement: Some("could"), severity: Severity::Medium },
-    TextRule { needle: "might possibly", message: "Hedging: 'might possibly'", replacement: Some("might"), severity: Severity::Medium },
-    TextRule { needle: "arguably could be considered", message: "Hedging: 'arguably could be considered'", replacement: None, severity: Severity::Medium },
-    // Sycophantic openers — Critical
-    TextRule { needle: "certainly!", message: "Sycophantic opener: 'Certainly!'", replacement: None, severity: Severity::Critical },
-    TextRule { needle: "great question!", message: "Sycophantic opener: 'Great question!'", replacement: None, severity: Severity::Critical },
-    TextRule { needle: "of course!", message: "Sycophantic opener: 'Of course!'", replacement: None, severity: Severity::Critical },
-    TextRule { needle: "absolutely!", message: "Sycophantic opener: 'Absolutely!'", replacement: None, severity: Severity::Critical },
-    // Chatbot closers — Critical
-    TextRule { needle: "i hope this helps", message: "Chatbot closer: 'I hope this helps'", replacement: None, severity: Severity::Critical },
-    TextRule { needle: "let me know if", message: "Chatbot closer: 'Let me know if'", replacement: None, severity: Severity::Critical },
-    TextRule { needle: "feel free to", message: "Chatbot closer: 'Feel free to'", replacement: None, severity: Severity::Critical },
-    // Filler phrases — Low
+    // === CRITICAL: r > 10× baseline (Kobak et al., Science Advances 2025) ===
+    // source: kobak2024 r=25.2 — most extreme outlier across 15M PubMed abstracts
+    TextRule { needle: "delve", message: "LLM tell: 'delve' (25× excess frequency, Kobak 2025)", replacement: Some("explore"), severity: Severity::Critical },
+    // source: kobak2024 r=25.2 — inflected form; word boundary prevents 'delves' matching 'delve'
+    TextRule { needle: "delves", message: "LLM tell: 'delves' (25× excess frequency, Kobak 2025)", replacement: Some("explores"), severity: Severity::Critical },
+    // source: kobak2024 r=9.2 — below the r>10 Critical threshold; High
+    TextRule { needle: "showcasing", message: "LLM tell: 'showcasing' (9.2× excess frequency, Kobak 2025)", replacement: None, severity: Severity::High },
+    // source: kobak2024 r=9.1 — below the r>10 Critical threshold; High
+    TextRule { needle: "underscore", message: "LLM tell: 'underscore/underscores' (9.1× excess frequency, Kobak 2025)", replacement: None, severity: Severity::High },
+
+    // === HIGH: r > 3× baseline (Kobak 2025, Liang 2024, Neri 2024) ===
+    // source: kobak2024 cross-validated; neri2024 confirmed
+    TextRule { needle: "meticulous", message: "LLM tell: 'meticulous' (Kobak 2025, Neri 2024)", replacement: None, severity: Severity::High },
+    // source: kobak2024 cross-validated; neri2024 confirmed
+    TextRule { needle: "meticulously", message: "LLM tell: 'meticulously' (Kobak 2025, Neri 2024)", replacement: None, severity: Severity::High },
+    // source: kobak2024; liang2024 — doubled post-2023
+    TextRule { needle: "intricate", message: "LLM tell: 'intricate' (Kobak 2025, Liang 2024)", replacement: None, severity: Severity::High },
+    // source: liang2024 — approximately doubled post-2023; neri2024 confirmed
+    TextRule { needle: "realm", message: "LLM tell: 'realm' (Liang 2024, Neri 2024)", replacement: None, severity: Severity::High },
+    // source: kobak2024; liang2024 — top cross-validated excess word
+    TextRule { needle: "pivotal", message: "LLM tell: 'pivotal' (Kobak 2025, Liang 2024)", replacement: Some("key"), severity: Severity::High },
+    // source: kobak2024 cross-validated
+    TextRule { needle: "notably", message: "LLM tell: 'notably' (Kobak 2025)", replacement: None, severity: Severity::High },
+    // source: kobak2024 high-frequency excess verb
+    TextRule { needle: "leveraging", message: "LLM filler: 'leveraging' (Kobak 2025)", replacement: Some("using"), severity: Severity::High },
+    // source: kobak2024 — verb form; distinct from leveraging
+    TextRule { needle: "leverage", message: "LLM filler: 'leverage' when used as verb (Kobak 2025)", replacement: Some("use"), severity: Severity::High },
+    // source: kobak2024 excess verb
+    TextRule { needle: "streamline", message: "LLM filler: 'streamline' (Kobak 2025)", replacement: None, severity: Severity::High },
+    // source: kobak2024 excess verb
+    TextRule { needle: "utilize", message: "LLM filler: 'utilize' (Kobak 2025)", replacement: Some("use"), severity: Severity::High },
+    // source: kobak2024 excess verb
+    TextRule { needle: "facilitate", message: "LLM filler: 'facilitate' (Kobak 2025)", replacement: Some("help"), severity: Severity::High },
+    // source: kobak2024 excess verb
+    TextRule { needle: "endeavor", message: "LLM filler: 'endeavor' (Kobak 2025)", replacement: Some("try"), severity: Severity::High },
+    // source: kobak2024 excess verb
+    TextRule { needle: "commence", message: "LLM filler: 'commence' (Kobak 2025)", replacement: Some("start"), severity: Severity::High },
+    // source: neri2024 confirmed; kobak2024 listed
+    TextRule { needle: "tapestry", message: "LLM filler: 'tapestry' (Neri 2024)", replacement: None, severity: Severity::High },
+    // source: neri2024 confirmed high z-score
+    TextRule { needle: "testament", message: "LLM filler: 'testament' (Neri 2024)", replacement: None, severity: Severity::High },
+    // source: neri2024 confirmed
+    TextRule { needle: "stands as a testament", message: "LLM cliché: 'stands as a testament' (Neri 2024)", replacement: None, severity: Severity::High },
+
+    // === MEDIUM: High δ but lower r — common words elevated by LLM (Kobak 2025 δ data) ===
+    // source: kobak2024 δ=0.041 — highest absolute gap; appears legitimately in many contexts
+    TextRule { needle: "comprehensive", message: "LLM filler: 'comprehensive' (Kobak 2025 δ=high)", replacement: Some("thorough"), severity: Severity::Medium },
+    // source: kobak2024 δ=0.026 — third highest gap
+    TextRule { needle: "crucial", message: "LLM filler: 'crucial' (Kobak 2025 δ=0.026)", replacement: Some("important"), severity: Severity::Medium },
+    // source: kobak2024 cross-validated; common word elevated
+    TextRule { needle: "particularly", message: "LLM filler: 'particularly' (Kobak 2025 cross-validated)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 cross-validated
+    TextRule { needle: "enhancing", message: "LLM tell: 'enhancing' (Kobak 2025 cross-validated)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 cross-validated
+    TextRule { needle: "exhibited", message: "LLM tell: 'exhibited' (Kobak 2025 cross-validated)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 cross-validated
+    TextRule { needle: "insights", message: "LLM filler: 'insights' (Kobak 2025 cross-validated)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 δ data — flagged as 'boast(s) X features' pattern
+    TextRule { needle: "boast", message: "LLM filler: 'boast/boasts' as in 'boasts features' (Kobak 2025)", replacement: None, severity: Severity::Medium },
+    // source: juzek2025 emerging signal 2024-2025
+    TextRule { needle: "harnessing", message: "LLM filler: 'harnessing' (Juzek 2025 emerging signal)", replacement: Some("using"), severity: Severity::Medium },
+    // source: juzek2025 emerging signal 2024-2025
+    TextRule { needle: "harnesses", message: "LLM filler: 'harnesses' (Juzek 2025 emerging signal)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 excess adj; pre-LLM marketing language with lower ratio than tier-1
+    TextRule { needle: "groundbreaking", message: "LLM filler: 'groundbreaking' (Kobak 2025)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 excess adj; lower ratio — pre-LLM marketing language
+    TextRule { needle: "innovative", message: "LLM filler: 'innovative' (Kobak 2025, lower ratio)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024; lower ratio — pre-LLM marketing language
+    TextRule { needle: "revolutionary", message: "LLM filler: 'revolutionary' (Kobak 2025, lower ratio)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024; lower ratio — pre-LLM marketing language
+    TextRule { needle: "cutting-edge", message: "LLM filler: 'cutting-edge' (Kobak 2025, lower ratio)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 excess adj — common in specs/RFCs; flag but acknowledge context
+    TextRule { needle: "robust", message: "LLM filler: 'robust' (Kobak 2025; legitimate in security specs — review context)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 excess adj
+    TextRule { needle: "multifaceted", message: "LLM filler: 'multifaceted' (Kobak 2025)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 excess adj
+    TextRule { needle: "vibrant", message: "LLM filler: 'vibrant' (Kobak 2025)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 excess adj
+    TextRule { needle: "seamlessly", message: "LLM filler: 'seamlessly' (Kobak 2025)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 excess adj
+    TextRule { needle: "ingrained", message: "LLM filler: 'ingrained' (Kobak 2025)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024 excess adj
+    TextRule { needle: "indelible", message: "LLM filler: 'indelible' (Kobak 2025)", replacement: None, severity: Severity::Medium },
+    // source: kobak2024; often used as connector phrase, not location
+    TextRule { needle: "evolving landscape", message: "LLM cliché: 'evolving landscape' (Kobak 2025)", replacement: None, severity: Severity::Medium },
+
+    // === SYCOPHANTIC OPENERS — Critical ===
+    // source: juzek2025 rlhf-confirmed — first-sentence validation-seeking patterns
+    TextRule { needle: "certainly!", message: "Sycophantic opener: 'Certainly!' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "great question!", message: "Sycophantic opener: 'Great question!' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "of course!", message: "Sycophantic opener: 'Of course!' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "absolutely!", message: "Sycophantic opener: 'Absolutely!' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "happy to help", message: "Sycophantic opener: 'happy to help' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "happy to explain", message: "Sycophantic opener: 'happy to explain' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "i'd be happy to", message: "Sycophantic opener: 'I'd be happy to' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "i would be happy to", message: "Sycophantic opener: 'I would be happy to' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+
+    // === CHATBOT CLOSERS — Critical ===
+    // source: juzek2025 rlhf-confirmed — closing validation patterns
+    TextRule { needle: "i hope this helps", message: "Chatbot closer: 'I hope this helps' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "let me know if", message: "Chatbot closer: 'Let me know if' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "feel free to", message: "Chatbot closer: 'Feel free to' (RLHF-induced, Juzek 2025)", replacement: None, severity: Severity::Critical },
+
+    // === LOW: Filler connectors and hedging ===
+    // source: rosenfeld2024 — discourse connectors elevated in LLM text; appear legitimately in academic writing
+    TextRule { needle: "moreover", message: "LLM connector: 'moreover' (Rosenfeld 2024)", replacement: None, severity: Severity::Low },
+    TextRule { needle: "furthermore", message: "LLM connector: 'furthermore' (Rosenfeld 2024)", replacement: None, severity: Severity::Low },
+    TextRule { needle: "subsequently", message: "LLM connector: 'subsequently' (Kobak 2025)", replacement: Some("then"), severity: Severity::Low },
+    TextRule { needle: "in conclusion", message: "LLM connector: 'in conclusion' (Rosenfeld 2024)", replacement: None, severity: Severity::Low },
+    TextRule { needle: "serves as a reminder", message: "LLM filler: 'serves as a reminder'", replacement: None, severity: Severity::Low },
+    // source: kobak2024 — hedging phrase
+    TextRule { needle: "it is worth noting", message: "LLM hedge: 'it is worth noting' (Kobak 2025)", replacement: None, severity: Severity::Low },
+    TextRule { needle: "it is important to note", message: "LLM hedge: 'it is important to note'", replacement: None, severity: Severity::Low },
+    TextRule { needle: "could potentially", message: "Hedging: 'could potentially'", replacement: Some("could"), severity: Severity::Low },
+    TextRule { needle: "might possibly", message: "Hedging: 'might possibly'", replacement: Some("might"), severity: Severity::Low },
+    TextRule { needle: "arguably could be considered", message: "Hedging: 'arguably could be considered'", replacement: None, severity: Severity::Low },
+    // source: common filler phrase
     TextRule { needle: "in order to", message: "Filler: 'in order to'", replacement: Some("to"), severity: Severity::Low },
     TextRule { needle: "due to the fact that", message: "Filler: 'due to the fact that'", replacement: Some("because"), severity: Severity::Low },
 ];
@@ -313,20 +383,6 @@ pub fn apply_code_rules(content: &str, enabled: &[CodeRule]) -> Vec<Finding> {
                 });
             }
 
-            // Tautological: comment immediately followed by code that says the same thing — Medium
-            if let Some(next_line) = lines.get(idx + 1) {
-                if is_tautological_comment(trimmed, next_line.trim()) {
-                    findings.push(Finding {
-                        line: lineno,
-                        col: 0,
-                        matched: trimmed.to_string(),
-                        message: "Tautological comment: restates the next line of code".to_string(),
-                        replacement: Some(String::new()),
-                        severity: Severity::Medium,
-                    });
-                }
-            }
-
             // Bare TODO without context — Critical
             if is_bare_todo(trimmed) {
                 findings.push(Finding {
@@ -416,42 +472,6 @@ fn is_section_header(line: &str) -> bool {
     }
 
     false
-}
-
-fn is_tautological_comment(comment_line: &str, next_line: &str) -> bool {
-    if !comment_line.starts_with('#') && !comment_line.starts_with("//") {
-        return false;
-    }
-
-    let comment_text = comment_line
-        .trim_start_matches(['#', '/', ' '])
-        .to_lowercase();
-
-    if comment_text.len() < 5 {
-        return false;
-    }
-
-    // Extract the key identifier from the next code line and check if comment
-    // is essentially rephrasing it. This is a heuristic.
-    let code_lower = next_line.to_lowercase();
-
-    // Check if the comment words substantially overlap with code tokens
-    let comment_words: Vec<&str> = comment_text
-        .split_whitespace()
-        .filter(|w| w.len() > 3)
-        .collect();
-
-    if comment_words.is_empty() {
-        return false;
-    }
-
-    let overlap = comment_words
-        .iter()
-        .filter(|&&w| code_lower.contains(w))
-        .count();
-
-    // Tautological if more than half the meaningful words appear in the code
-    overlap * 2 > comment_words.len()
 }
 
 fn is_bare_todo(line: &str) -> bool {
@@ -562,7 +582,7 @@ fn check_commit_patterns(line: &str, lineno: usize, findings: &mut Vec<Finding>)
         if lower.contains(phrase) {
             findings.push(Finding {
                 line: lineno,
-                col: lower.find(phrase).expect("contains() guarantees find() succeeds"),
+                col: lower.find(phrase).expect("contains guarantees find"),
                 matched: phrase.to_string(),
                 message: format!("Vague commit message: '{}'", phrase),
                 replacement: None,
@@ -570,6 +590,192 @@ fn check_commit_patterns(line: &str, lineno: usize, findings: &mut Vec<Finding>)
             });
         }
     }
+
+    // Past tense in subject line — High
+    // source: lopes2024 icse — human commits use imperative; LLM commits use past tense
+    if lineno == 1 {
+        let past_tense_verbs = [
+            "added", "fixed", "updated", "changed", "removed", "modified",
+            "implemented", "refactored", "created", "deleted", "moved",
+            "improved", "enhanced", "cleaned", "bumped", "dropped", "replaced",
+            "resolved", "addressed", "reverted",
+        ];
+        let first_word = lower.split_whitespace().next().unwrap_or("");
+        // Strip conventional commit prefix if present (e.g. "feat: added" -> check "added")
+        let effective_first = if first_word.ends_with(':') {
+            lower.split_whitespace().nth(1).unwrap_or("")
+        } else {
+            first_word
+        };
+        if past_tense_verbs.contains(&effective_first) {
+            findings.push(Finding {
+                line: lineno,
+                col: lower.find(effective_first).unwrap_or(0),
+                matched: effective_first.to_string(),
+                message: "Past tense in commit subject: use imperative mood ('add' not 'added')".to_string(),
+                replacement: None,
+                severity: Severity::High,
+            });
+        }
+    }
+
+    // Vague scope words in subject line — High
+    // source: lopes2024 — human commits name one specific thing
+    if lineno == 1 {
+        let vague_scope = ["various", "several", "multiple", "many"];
+        for word in &vague_scope {
+            let mut start = 0;
+            while let Some(pos) = lower[start..].find(word) {
+                let abs = start + pos;
+                let end = abs + word.len();
+                let before_ok = abs == 0 || !lower[..abs].chars().last().unwrap_or(' ').is_alphanumeric();
+                let after_ok = end >= lower.len() || !lower[end..].chars().next().unwrap_or(' ').is_alphanumeric();
+                if before_ok && after_ok {
+                    findings.push(Finding {
+                        line: lineno,
+                        col: abs,
+                        matched: word.to_string(),
+                        message: "Vague scope in commit subject: name the specific change".to_string(),
+                        replacement: None,
+                        severity: Severity::High,
+                    });
+                    break; // one finding per word
+                }
+                start = end;
+            }
+        }
+    }
+
+    // Title-case subject line — Medium
+    if lineno == 1 {
+        let words: Vec<&str> = line.split_whitespace().collect();
+        // Skip conventional commit prefix (word ending in ':')
+        let content_words: Vec<&str> = words.iter()
+            .skip_while(|w| w.ends_with(':'))
+            .copied()
+            .collect();
+        let capitalized_count = content_words.iter()
+            .filter(|w| w.chars().next().map(|c| c.is_uppercase()).unwrap_or(false))
+            .count();
+        if content_words.len() >= 3 && capitalized_count >= 3 {
+            findings.push(Finding {
+                line: lineno,
+                col: 0,
+                matched: line.to_string(),
+                message: "Title-case commit subject: use sentence case".to_string(),
+                replacement: None,
+                severity: Severity::Medium,
+            });
+        }
+    }
+
+    // Multiline body on single-purpose fix — Low
+    // source: arxiv2601.17406 — multiline commit ratio top fingerprint feature
+    if lineno == 3 && !line.trim().is_empty() {
+        findings.push(Finding {
+            line: lineno,
+            col: 0,
+            matched: line.to_string(),
+            message: "Commit body on single-purpose change may over-explain (arxiv:2601.17406)".to_string(),
+            replacement: None,
+            severity: Severity::Low,
+        });
+    }
+}
+
+/// Apply structural rules that catch paragraph-level patterns.
+/// These operate on whole-document structure, not individual lines.
+// source: rosenfeld2024 — structural signals more stable than lexical patterns
+pub fn apply_structural_rules(content: &str) -> Vec<Finding> {
+    let mut findings = Vec::new();
+
+    // Split into paragraphs (double newline)
+    let paragraphs: Vec<&str> = content.split("\n\n").collect();
+    let mut line_offset = 1usize; // track line number of paragraph start
+
+    // Discourse connectors for density check
+    // source: rosenfeld2024 — structural signals more stable than lexical
+    let connectors: &[&str] = &[
+        "moreover", "furthermore", "additionally", "consequently", "subsequently",
+        "nevertheless", "nonetheless", "in addition", "as a result",
+        "on the other hand", "with that said", "that being said",
+        "to summarize", "in summary", "in conclusion",
+    ];
+
+    for para in &paragraphs {
+        let para_lower = para.to_lowercase();
+
+        // Count connector occurrences
+        let count: usize = connectors.iter()
+            .map(|&c| {
+                let mut n = 0;
+                let mut start = 0;
+                while let Some(pos) = para_lower[start..].find(c) {
+                    n += 1;
+                    start += pos + c.len();
+                }
+                n
+            })
+            .sum();
+
+        if count >= 3 {
+            findings.push(Finding {
+                line: line_offset,
+                col: 0,
+                matched: format!("{} discourse connectors", count),
+                message: format!(
+                    "High connector density ({}): reads as machine-generated transitions (Rosenfeld 2024)",
+                    count
+                ),
+                replacement: None,
+                severity: Severity::High,
+            });
+        }
+
+        // Sentence length uniformity check
+        // source: rosenfeld2024 sentence-length-clustering
+        let sentence_endings = [". ", "! ", "? ", ".\n", "!\n", "?\n"];
+        let mut sentences: Vec<&str> = Vec::new();
+        let mut remaining = para.trim();
+        while !remaining.is_empty() {
+            // Find the earliest sentence ending, or consume the rest as a final fragment.
+            let cut = sentence_endings
+                .iter()
+                .filter_map(|ending| remaining.find(ending).map(|pos| pos + ending.len()))
+                .min()
+                .unwrap_or(remaining.len());
+            let (sentence, rest) = remaining.split_at(cut);
+            sentences.push(sentence);
+            remaining = rest.trim_start();
+        }
+
+        if sentences.len() >= 4 {
+            let word_counts: Vec<f64> = sentences.iter()
+                .map(|s| s.split_whitespace().count() as f64)
+                .collect();
+            let mean = word_counts.iter().sum::<f64>() / word_counts.len() as f64;
+            let variance = word_counts.iter()
+                .map(|&x| (x - mean).powi(2))
+                .sum::<f64>() / word_counts.len() as f64;
+            let stddev = variance.sqrt();
+
+            if stddev < 3.0 && mean > 5.0 {
+                findings.push(Finding {
+                    line: line_offset,
+                    col: 0,
+                    matched: format!("stddev={:.1}", stddev),
+                    message: "Uniform sentence length — LLMs cluster in 10-30 token range (Rosenfeld 2024)".to_string(),
+                    replacement: None,
+                    severity: Severity::Medium,
+                });
+            }
+        }
+
+        // Advance line offset past this paragraph
+        line_offset += para.lines().count() + 2; // +2 for double newline separator
+    }
+
+    findings
 }
 
 /// Produce a cleaned version of content, removing empty-replacement lines and
@@ -687,6 +893,14 @@ mod tests {
     }
 
     #[test]
+    fn clean_two_replacements_same_line() {
+        let input = "utilize and facilitate this.";
+        let findings = apply_text_rules(input);
+        let cleaned = clean(input, &findings);
+        assert_eq!(cleaned, "use and help this.", "both replacements must be applied correctly, got: {}", cleaned);
+    }
+
+    #[test]
     fn section_header_detected() {
         let findings = apply_code_rules("# --- Setup ---\nfn main() {}", &[CodeRule::Comments]);
         assert!(findings.iter().any(|f| f.message.contains("Section header")));
@@ -733,10 +947,10 @@ mod tests {
     }
 
     #[test]
-    fn severity_medium_for_filler_connector() {
+    fn severity_low_for_filler_connector() {
         let findings = apply_text_rules("Moreover, this is good.");
         let f = findings.iter().find(|f| f.matched.to_lowercase() == "moreover").unwrap();
-        assert_eq!(f.severity, Severity::Medium);
+        assert_eq!(f.severity, Severity::Low);
     }
 
     #[test]
@@ -811,9 +1025,10 @@ mod challenge_tests {
         let f = apply_text_rules("C'est une décision pivotale.");
         assert!(f.is_empty(), "pivotale should not be flagged, got: {:?}", f.iter().map(|x|&x.matched).collect::<Vec<_>>());
     }
-    #[test] fn delves_unchanged() {
+    #[test] fn delves_fires() {
         let f = apply_text_rules("She delves into the topic.");
-        assert!(f.is_empty(), "delves should not be flagged, got: {:?}", f.iter().map(|x|&x.matched).collect::<Vec<_>>());
+        assert!(!f.is_empty(), "delves should be flagged as LLM tell");
+        assert!(f.iter().any(|x| x.matched.to_lowercase().contains("delve")));
     }
     #[test] fn commencement_unchanged() {
         let input = "The commencement ceremony starts now.";
@@ -932,6 +1147,129 @@ mod challenge_tests {
         assert!(
             f.iter().all(|x| x.matched.to_lowercase() != "utilize"),
             "unclosed backtick: conservative — utilize should not be flagged"
+        );
+    }
+
+    // --- Phase 2: Kobak empirical data tests ---
+    #[test]
+    fn finds_showcasing() {
+        let findings = apply_text_rules("This work showcasing the results.");
+        assert!(findings.iter().any(|f| f.matched.to_lowercase() == "showcasing"));
+        let f = findings.iter().find(|f| f.matched.to_lowercase() == "showcasing").unwrap();
+        // r=9.2 — below the Critical threshold of r>10; correctly classified as High
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn finds_meticulous() {
+        let findings = apply_text_rules("The meticulous analysis was thorough.");
+        assert!(findings.iter().any(|f| f.matched.to_lowercase() == "meticulous"));
+        let f = findings.iter().find(|f| f.matched.to_lowercase() == "meticulous").unwrap();
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn finds_realm() {
+        let findings = apply_text_rules("In the realm of computing.");
+        assert!(findings.iter().any(|f| f.matched.to_lowercase() == "realm"));
+    }
+
+    #[test]
+    fn finds_intricate() {
+        let findings = apply_text_rules("The intricate details matter.");
+        assert!(findings.iter().any(|f| f.matched.to_lowercase() == "intricate"));
+    }
+
+    #[test]
+    fn finds_happy_to_help() {
+        let findings = apply_text_rules("I'd be happy to help you with that.");
+        assert!(findings.iter().any(|f| f.message.contains("Sycophantic")));
+    }
+}
+
+#[cfg(test)]
+mod structural_tests {
+    use super::*;
+
+    #[test]
+    fn connector_density_fires() {
+        let para = "Moreover, this is important. Furthermore, we note that. Additionally, as a result, the data shows. Consequently, we conclude.";
+        let findings = apply_structural_rules(para);
+        assert!(
+            findings.iter().any(|f| f.message.contains("connector density")),
+            "high connector density should fire, got: {:?}", findings.iter().map(|f| &f.message).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn connector_density_exactly_three_fires() {
+        // Exactly 3 connectors — must fire (boundary case for >= 3 threshold)
+        let para = "Moreover, this is the case. Furthermore, it matters. Additionally, we note this.";
+        let findings = apply_structural_rules(para);
+        assert!(
+            findings.iter().any(|f| f.message.contains("connector density")),
+            "exactly 3 connectors should fire at the >= 3 threshold"
+        );
+    }
+
+    #[test]
+    fn connector_density_low_count_no_fire() {
+        let para = "Moreover, this is important. Furthermore, this helps.";
+        let findings = apply_structural_rules(para);
+        assert!(
+            !findings.iter().any(|f| f.message.contains("connector density")),
+            "2 connectors should not fire"
+        );
+    }
+
+    #[test]
+    fn structural_rules_empty_input() {
+        let findings = apply_structural_rules("");
+        assert!(findings.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod commit_tests {
+    use super::*;
+
+    #[test]
+    fn commit_past_tense_fires() {
+        let findings = apply_code_rules("Added authentication logic", &[CodeRule::Commits]);
+        assert!(
+            findings.iter().any(|f| f.message.contains("imperative mood")),
+            "past tense should fire, got: {:?}", findings.iter().map(|f| &f.message).collect::<Vec<_>>()
+        );
+        let f = findings.iter().find(|f| f.message.contains("imperative")).unwrap();
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn commit_imperative_no_fire() {
+        let findings = apply_code_rules("Add authentication logic", &[CodeRule::Commits]);
+        assert!(
+            !findings.iter().any(|f| f.message.contains("imperative mood")),
+            "imperative mood should not fire for 'Add'"
+        );
+    }
+
+    #[test]
+    fn commit_conventional_prefix_past_tense_fires() {
+        // "feat: added X" — prefix must be stripped before past-tense check
+        let findings = apply_code_rules("feat: added authentication logic", &[CodeRule::Commits]);
+        assert!(
+            findings.iter().any(|f| f.message.contains("imperative mood")),
+            "past tense should fire even with conventional commit prefix, got: {:?}",
+            findings.iter().map(|f| &f.message).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn commit_vague_scope_fires() {
+        let findings = apply_code_rules("Updated several files for release", &[CodeRule::Commits]);
+        assert!(
+            findings.iter().any(|f| f.message.contains("Vague scope")),
+            "vague scope should fire, got: {:?}", findings.iter().map(|f| &f.message).collect::<Vec<_>>()
         );
     }
 }

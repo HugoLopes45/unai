@@ -1,3 +1,24 @@
+/// Severity level of a finding.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Severity {
+    Critical,
+    High,
+    Medium,
+    Low,
+}
+
+impl Severity {
+    /// Numeric rank for filtering: higher = more severe.
+    pub fn rank(&self) -> u8 {
+        match self {
+            Self::Critical => 3,
+            Self::High => 2,
+            Self::Medium => 1,
+            Self::Low => 0,
+        }
+    }
+}
+
 /// A single match found in the input.
 #[derive(Debug, Clone)]
 pub struct Finding {
@@ -11,6 +32,8 @@ pub struct Finding {
     pub message: String,
     /// Replacement text if auto-fixable, otherwise None.
     pub replacement: Option<String>,
+    /// Severity classification.
+    pub severity: Severity,
 }
 
 // ---------------------------------------------------------------------------
@@ -23,69 +46,91 @@ struct TextRule {
     message: &'static str,
     /// Optional auto-fix replacement. If None, the finding is flagged only.
     replacement: Option<&'static str>,
+    severity: Severity,
 }
 
 const TEXT_RULES: &[TextRule] = &[
-    // Banned LLM buzzwords
-    TextRule { needle: "tapestry", message: "LLM filler: 'tapestry'", replacement: None },
-    TextRule { needle: "testament", message: "LLM filler: 'testament'", replacement: None },
-    TextRule { needle: "delve", message: "LLM filler: 'delve'", replacement: Some("explore") },
-    TextRule { needle: "pivotal", message: "LLM filler: 'pivotal'", replacement: Some("key") },
-    TextRule { needle: "comprehensive", message: "LLM filler: 'comprehensive'", replacement: Some("thorough") },
-    TextRule { needle: "multifaceted", message: "LLM filler: 'multifaceted'", replacement: None },
-    TextRule { needle: "evolving landscape", message: "LLM cliché: 'evolving landscape'", replacement: None },
-    TextRule { needle: "vibrant", message: "LLM filler: 'vibrant'", replacement: None },
-    TextRule { needle: "crucial", message: "LLM filler: 'crucial'", replacement: Some("important") },
-    TextRule { needle: "moreover", message: "LLM filler: 'moreover'", replacement: None },
-    TextRule { needle: "furthermore", message: "LLM filler: 'furthermore'", replacement: None },
-    TextRule { needle: "in conclusion", message: "LLM filler: 'in conclusion'", replacement: None },
-    TextRule { needle: "serves as a reminder", message: "LLM filler: 'serves as a reminder'", replacement: None },
-    TextRule { needle: "stands as a testament", message: "LLM filler: 'stands as a testament'", replacement: None },
-    TextRule { needle: "ingrained", message: "LLM filler: 'ingrained'", replacement: None },
-    TextRule { needle: "indelible", message: "LLM filler: 'indelible'", replacement: None },
-    TextRule { needle: "leveraging", message: "LLM filler: 'leveraging'", replacement: Some("using") },
-    TextRule { needle: "seamlessly", message: "LLM filler: 'seamlessly'", replacement: None },
-    TextRule { needle: "robust", message: "LLM filler: 'robust'", replacement: None },
-    TextRule { needle: "cutting-edge", message: "LLM filler: 'cutting-edge'", replacement: None },
-    TextRule { needle: "revolutionary", message: "LLM filler: 'revolutionary'", replacement: None },
-    TextRule { needle: "innovative", message: "LLM filler: 'innovative'", replacement: None },
-    TextRule { needle: "groundbreaking", message: "LLM filler: 'groundbreaking'", replacement: None },
-    TextRule { needle: "streamline", message: "LLM filler: 'streamline'", replacement: None },
-    TextRule { needle: "utilize", message: "LLM filler: 'utilize'", replacement: Some("use") },
-    TextRule { needle: "facilitate", message: "LLM filler: 'facilitate'", replacement: Some("help") },
-    TextRule { needle: "endeavor", message: "LLM filler: 'endeavor'", replacement: Some("try") },
-    TextRule { needle: "commence", message: "LLM filler: 'commence'", replacement: Some("start") },
-    TextRule { needle: "subsequently", message: "LLM filler: 'subsequently'", replacement: Some("then") },
-    TextRule { needle: "it is worth noting", message: "LLM hedge: 'it is worth noting'", replacement: None },
-    TextRule { needle: "it is important to note", message: "LLM hedge: 'it is important to note'", replacement: None },
-    TextRule { needle: "notably", message: "LLM filler: 'notably'", replacement: None },
-    // Sycophantic openers
-    TextRule { needle: "certainly!", message: "Sycophantic opener: 'Certainly!'", replacement: None },
-    TextRule { needle: "great question!", message: "Sycophantic opener: 'Great question!'", replacement: None },
-    TextRule { needle: "of course!", message: "Sycophantic opener: 'Of course!'", replacement: None },
-    TextRule { needle: "absolutely!", message: "Sycophantic opener: 'Absolutely!'", replacement: None },
-    // Chatbot closers
-    TextRule { needle: "i hope this helps", message: "Chatbot closer: 'I hope this helps'", replacement: None },
-    TextRule { needle: "let me know if", message: "Chatbot closer: 'Let me know if'", replacement: None },
-    TextRule { needle: "feel free to", message: "Chatbot closer: 'Feel free to'", replacement: None },
-    // Filler phrases
-    TextRule { needle: "in order to", message: "Filler: 'in order to'", replacement: Some("to") },
-    TextRule { needle: "due to the fact that", message: "Filler: 'due to the fact that'", replacement: Some("because") },
-    // Hedging
-    TextRule { needle: "could potentially", message: "Hedging: 'could potentially'", replacement: Some("could") },
-    TextRule { needle: "might possibly", message: "Hedging: 'might possibly'", replacement: Some("might") },
-    TextRule { needle: "arguably could be considered", message: "Hedging: 'arguably could be considered'", replacement: None },
+    // Banned LLM buzzwords — High
+    TextRule { needle: "tapestry", message: "LLM filler: 'tapestry'", replacement: None, severity: Severity::High },
+    TextRule { needle: "testament", message: "LLM filler: 'testament'", replacement: None, severity: Severity::High },
+    TextRule { needle: "stands as a testament", message: "LLM filler: 'stands as a testament'", replacement: None, severity: Severity::High },
+    TextRule { needle: "delve", message: "LLM filler: 'delve'", replacement: Some("explore"), severity: Severity::High },
+    TextRule { needle: "pivotal", message: "LLM filler: 'pivotal'", replacement: Some("key"), severity: Severity::High },
+    TextRule { needle: "comprehensive", message: "LLM filler: 'comprehensive'", replacement: Some("thorough"), severity: Severity::High },
+    TextRule { needle: "multifaceted", message: "LLM filler: 'multifaceted'", replacement: None, severity: Severity::High },
+    TextRule { needle: "evolving landscape", message: "LLM cliché: 'evolving landscape'", replacement: None, severity: Severity::High },
+    TextRule { needle: "vibrant", message: "LLM filler: 'vibrant'", replacement: None, severity: Severity::High },
+    TextRule { needle: "crucial", message: "LLM filler: 'crucial'", replacement: Some("important"), severity: Severity::High },
+    TextRule { needle: "ingrained", message: "LLM filler: 'ingrained'", replacement: None, severity: Severity::High },
+    TextRule { needle: "indelible", message: "LLM filler: 'indelible'", replacement: None, severity: Severity::High },
+    TextRule { needle: "leveraging", message: "LLM filler: 'leveraging'", replacement: Some("using"), severity: Severity::High },
+    TextRule { needle: "seamlessly", message: "LLM filler: 'seamlessly'", replacement: None, severity: Severity::High },
+    TextRule { needle: "robust", message: "LLM filler: 'robust'", replacement: None, severity: Severity::High },
+    TextRule { needle: "cutting-edge", message: "LLM filler: 'cutting-edge'", replacement: None, severity: Severity::High },
+    TextRule { needle: "revolutionary", message: "LLM filler: 'revolutionary'", replacement: None, severity: Severity::High },
+    TextRule { needle: "innovative", message: "LLM filler: 'innovative'", replacement: None, severity: Severity::High },
+    TextRule { needle: "groundbreaking", message: "LLM filler: 'groundbreaking'", replacement: None, severity: Severity::High },
+    TextRule { needle: "streamline", message: "LLM filler: 'streamline'", replacement: None, severity: Severity::High },
+    TextRule { needle: "utilize", message: "LLM filler: 'utilize'", replacement: Some("use"), severity: Severity::High },
+    TextRule { needle: "facilitate", message: "LLM filler: 'facilitate'", replacement: Some("help"), severity: Severity::High },
+    TextRule { needle: "endeavor", message: "LLM filler: 'endeavor'", replacement: Some("try"), severity: Severity::High },
+    TextRule { needle: "commence", message: "LLM filler: 'commence'", replacement: Some("start"), severity: Severity::High },
+    TextRule { needle: "subsequently", message: "LLM filler: 'subsequently'", replacement: Some("then"), severity: Severity::High },
+    TextRule { needle: "notably", message: "LLM filler: 'notably'", replacement: None, severity: Severity::High },
+    // Filler connectors and hedging — Medium
+    TextRule { needle: "moreover", message: "LLM filler: 'moreover'", replacement: None, severity: Severity::Medium },
+    TextRule { needle: "furthermore", message: "LLM filler: 'furthermore'", replacement: None, severity: Severity::Medium },
+    TextRule { needle: "in conclusion", message: "LLM filler: 'in conclusion'", replacement: None, severity: Severity::Medium },
+    TextRule { needle: "serves as a reminder", message: "LLM filler: 'serves as a reminder'", replacement: None, severity: Severity::Medium },
+    TextRule { needle: "it is worth noting", message: "LLM hedge: 'it is worth noting'", replacement: None, severity: Severity::Medium },
+    TextRule { needle: "it is important to note", message: "LLM hedge: 'it is important to note'", replacement: None, severity: Severity::Medium },
+    TextRule { needle: "could potentially", message: "Hedging: 'could potentially'", replacement: Some("could"), severity: Severity::Medium },
+    TextRule { needle: "might possibly", message: "Hedging: 'might possibly'", replacement: Some("might"), severity: Severity::Medium },
+    TextRule { needle: "arguably could be considered", message: "Hedging: 'arguably could be considered'", replacement: None, severity: Severity::Medium },
+    // Sycophantic openers — Critical
+    TextRule { needle: "certainly!", message: "Sycophantic opener: 'Certainly!'", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "great question!", message: "Sycophantic opener: 'Great question!'", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "of course!", message: "Sycophantic opener: 'Of course!'", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "absolutely!", message: "Sycophantic opener: 'Absolutely!'", replacement: None, severity: Severity::Critical },
+    // Chatbot closers — Critical
+    TextRule { needle: "i hope this helps", message: "Chatbot closer: 'I hope this helps'", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "let me know if", message: "Chatbot closer: 'Let me know if'", replacement: None, severity: Severity::Critical },
+    TextRule { needle: "feel free to", message: "Chatbot closer: 'Feel free to'", replacement: None, severity: Severity::Critical },
+    // Filler phrases — Low
+    TextRule { needle: "in order to", message: "Filler: 'in order to'", replacement: Some("to"), severity: Severity::Low },
+    TextRule { needle: "due to the fact that", message: "Filler: 'due to the fact that'", replacement: Some("because"), severity: Severity::Low },
 ];
 
 pub fn apply_text_rules(content: &str) -> Vec<Finding> {
     let mut findings = Vec::new();
+    let mut in_code_block = false;
 
     for (line_idx, line) in content.lines().enumerate() {
+        let trimmed = line.trim();
+
+        // Toggle fenced code block state and skip the fence line itself.
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+        if in_code_block {
+            continue;
+        }
+        // Skip bare URL lines (no prose context to flag).
+        if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
+            continue;
+        }
+
         let line_lower = line.to_lowercase();
         for rule in TEXT_RULES {
             let mut search_start = 0usize;
             while let Some(pos) = line_lower[search_start..].find(rule.needle) {
                 let col = search_start + pos;
+                // Skip matches inside inline backtick spans.
+                if is_in_backtick_span(line, col, col + rule.needle.len()) {
+                    search_start = col + rule.needle.len();
+                    continue;
+                }
                 let matched = &line[col..col + rule.needle.len()];
                 findings.push(Finding {
                     line: line_idx + 1,
@@ -93,6 +138,7 @@ pub fn apply_text_rules(content: &str) -> Vec<Finding> {
                     matched: matched.to_string(),
                     message: rule.message.to_string(),
                     replacement: rule.replacement.map(str::to_string),
+                    severity: rule.severity.clone(),
                 });
                 search_start = col + rule.needle.len();
             }
@@ -100,6 +146,32 @@ pub fn apply_text_rules(content: &str) -> Vec<Finding> {
     }
 
     findings
+}
+
+/// Returns `true` if byte range `[start, end)` falls inside an inline backtick span.
+fn is_in_backtick_span(line: &str, start: usize, _end: usize) -> bool {
+    let mut inside = false;
+    let chars: Vec<char> = line.chars().collect();
+    let mut char_byte_positions: Vec<usize> = Vec::with_capacity(chars.len());
+    {
+        let mut pos = 0usize;
+        for &c in &chars {
+            char_byte_positions.push(pos);
+            pos += c.len_utf8();
+        }
+    }
+    let mut i = 0usize;
+    while i < chars.len() {
+        let byte_pos = char_byte_positions[i];
+        if chars[i] == '`' {
+            inside = !inside;
+        }
+        if byte_pos >= start {
+            return inside && chars[i] != '`';
+        }
+        i += 1;
+    }
+    false
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +218,7 @@ pub fn apply_code_rules(content: &str, enabled: &[CodeRule]) -> Vec<Finding> {
 
         // Comments rules
         if all || enabled.contains(&CodeRule::Comments) {
-            // Section header comments
+            // Section header comments — High
             if is_section_header(trimmed) {
                 findings.push(Finding {
                     line: lineno,
@@ -154,10 +226,11 @@ pub fn apply_code_rules(content: &str, enabled: &[CodeRule]) -> Vec<Finding> {
                     matched: trimmed.to_string(),
                     message: "Section header comment: dividers add noise without value".to_string(),
                     replacement: None,
+                    severity: Severity::High,
                 });
             }
 
-            // Tautological: comment immediately followed by code that says the same thing
+            // Tautological: comment immediately followed by code that says the same thing — Medium
             if let Some(next_line) = lines.get(idx + 1) {
                 if is_tautological_comment(trimmed, next_line.trim()) {
                     findings.push(Finding {
@@ -166,11 +239,12 @@ pub fn apply_code_rules(content: &str, enabled: &[CodeRule]) -> Vec<Finding> {
                         matched: trimmed.to_string(),
                         message: "Tautological comment: restates the next line of code".to_string(),
                         replacement: Some(String::new()),
+                        severity: Severity::Medium,
                     });
                 }
             }
 
-            // Bare TODO without context
+            // Bare TODO without context — Critical
             if is_bare_todo(trimmed) {
                 findings.push(Finding {
                     line: lineno,
@@ -178,11 +252,12 @@ pub fn apply_code_rules(content: &str, enabled: &[CodeRule]) -> Vec<Finding> {
                     matched: trimmed.to_string(),
                     message: "Bare TODO without context or ticket reference".to_string(),
                     replacement: None,
+                    severity: Severity::Critical,
                 });
             }
         }
 
-        // Docstrings / prose-in-code rules
+        // Docstrings / prose-in-code rules — High
         if all || enabled.contains(&CodeRule::Docstrings) {
             let docstring_phrases = [
                 "this function serves as",
@@ -198,6 +273,7 @@ pub fn apply_code_rules(content: &str, enabled: &[CodeRule]) -> Vec<Finding> {
                         matched: phrase.to_string(),
                         message: format!("LLM docstring boilerplate: '{phrase}'"),
                         replacement: None,
+                        severity: Severity::High,
                     });
                 }
             }
@@ -321,7 +397,7 @@ fn is_bare_todo(line: &str) -> bool {
 }
 
 fn check_naming(line: &str, lineno: usize, findings: &mut Vec<Finding>) {
-    // Variable / class names ending in Manager, Handler, Helper, Util, Utility, Service
+    // Variable / class names ending in Manager, Handler, Helper, Util, Utility, Service — High
     let suffixes = ["Manager", "Handler", "Helper", "Util", "Utility", "Service"];
     for suffix in &suffixes {
         // Match word boundaries: the suffix must end the token
@@ -335,11 +411,12 @@ fn check_naming(line: &str, lineno: usize, findings: &mut Vec<Finding>) {
                     suffix
                 ),
                 replacement: None,
+                severity: Severity::High,
             });
         }
     }
 
-    // Redundant type-in-name patterns
+    // Redundant type-in-name patterns — Medium
     let redundant = [
         ("userDataObject", "user"),
         ("configurationSettings", "config"),
@@ -355,6 +432,7 @@ fn check_naming(line: &str, lineno: usize, findings: &mut Vec<Finding>) {
                 matched: bad.to_string(),
                 message: format!("Type-in-name anti-pattern: use '{}' instead", suggestion),
                 replacement: None, // naming changes require manual review — no auto-fix
+                severity: Severity::Medium,
             });
         }
     }
@@ -395,7 +473,7 @@ fn find_suffix_token(line: &str, suffix: &str) -> Option<usize> {
 fn check_commit_patterns(line: &str, lineno: usize, findings: &mut Vec<Finding>) {
     let lower = line.to_lowercase();
 
-    // Vague commit verbs
+    // Vague commit verbs — Low
     let vague = ["update stuff", "fix things", "wip", "misc changes", "minor fixes"];
     for phrase in &vague {
         if lower.contains(phrase) {
@@ -405,6 +483,7 @@ fn check_commit_patterns(line: &str, lineno: usize, findings: &mut Vec<Finding>)
                 matched: phrase.to_string(),
                 message: format!("Vague commit message: '{}'", phrase),
                 replacement: None,
+                severity: Severity::Low,
             });
         }
     }
@@ -618,5 +697,88 @@ mod tests {
         let findings = apply_text_rules(content);
         let cleaned = clean(content, &findings);
         assert!(cleaned.ends_with('\n'));
+    }
+
+    #[test]
+    fn severity_critical_for_sycophantic() {
+        let findings = apply_text_rules("Certainly! Here is the answer.");
+        let f = findings.iter().find(|f| f.matched.to_lowercase() == "certainly!").unwrap();
+        assert_eq!(f.severity, Severity::Critical);
+    }
+
+    #[test]
+    fn severity_high_for_buzzword() {
+        let findings = apply_text_rules("We are leveraging new tech.");
+        let f = findings.iter().find(|f| f.matched.to_lowercase() == "leveraging").unwrap();
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn severity_medium_for_filler_connector() {
+        let findings = apply_text_rules("Moreover, this is good.");
+        let f = findings.iter().find(|f| f.matched.to_lowercase() == "moreover").unwrap();
+        assert_eq!(f.severity, Severity::Medium);
+    }
+
+    #[test]
+    fn severity_low_for_filler_phrase() {
+        let findings = apply_text_rules("In order to proceed, do this.");
+        let f = findings.iter().find(|f| f.matched.to_lowercase() == "in order to").unwrap();
+        assert_eq!(f.severity, Severity::Low);
+    }
+
+    #[test]
+    fn severity_critical_for_bare_todo() {
+        let findings = apply_code_rules("# TODO: fix this", &[CodeRule::Comments]);
+        let f = findings.iter().find(|f| f.message.contains("Bare TODO")).unwrap();
+        assert_eq!(f.severity, Severity::Critical);
+    }
+
+    #[test]
+    fn severity_high_for_section_header() {
+        let findings = apply_code_rules("# --- Setup ---\nfn main() {}", &[CodeRule::Comments]);
+        let f = findings.iter().find(|f| f.message.contains("Section header")).unwrap();
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn severity_high_for_anemic_suffix() {
+        let findings = apply_code_rules("let userManager = ...", &[CodeRule::Naming]);
+        let f = findings.iter().find(|f| f.matched == "Manager").unwrap();
+        assert_eq!(f.severity, Severity::High);
+    }
+
+    #[test]
+    fn severity_medium_for_type_in_name() {
+        let findings = apply_code_rules("let userDataObject = ...", &[CodeRule::Naming]);
+        let f = findings.iter().find(|f| f.message.contains("Type-in-name")).unwrap();
+        assert_eq!(f.severity, Severity::Medium);
+    }
+
+    #[test]
+    fn code_block_not_flagged() {
+        let input = "Some prose.\n```\nutilize this approach.\n```\nEnd.\n";
+        let findings = apply_text_rules(input);
+        assert!(
+            findings.iter().all(|f| f.matched.to_lowercase() != "utilize"),
+            "utilize inside fenced block should not be flagged"
+        );
+    }
+
+    #[test]
+    fn url_line_not_flagged() {
+        let input = "https://example.com/utilize-this-comprehensive-guide";
+        let findings = apply_text_rules(input);
+        assert!(findings.is_empty(), "bare URL line should produce no findings");
+    }
+
+    #[test]
+    fn inline_code_not_flagged() {
+        let input = "Call `utilize` to proceed.";
+        let findings = apply_text_rules(input);
+        assert!(
+            findings.iter().all(|f| f.matched.to_lowercase() != "utilize"),
+            "utilize inside backtick span should not be flagged"
+        );
     }
 }

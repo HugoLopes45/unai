@@ -9,7 +9,7 @@ use std::process;
 use clap::{Parser, ValueEnum};
 
 use detector::{detect_mode, is_commit_msg_file, Mode};
-use rules::{apply_code_rules, apply_text_rules, clean, CodeRule, Finding};
+use rules::{apply_code_rules, apply_text_rules, clean, CodeRule, Finding, Severity};
 
 // ---------------------------------------------------------------------------
 // CLI definition
@@ -44,9 +44,13 @@ struct Args {
     #[arg(long)]
     annotate: bool,
 
-    /// Print a summary of patterns found.
+    /// Print a summary of patterns found, grouped by severity.
     #[arg(long)]
     report: bool,
+
+    /// Only show findings at or above this severity level.
+    #[arg(long, value_enum, default_value = "low")]
+    min_severity: MinSeverityArg,
 }
 
 #[derive(ValueEnum, Debug, Clone, PartialEq)]
@@ -54,6 +58,25 @@ enum ModeArg {
     Auto,
     Text,
     Code,
+}
+
+#[derive(ValueEnum, Debug, Clone, PartialEq)]
+enum MinSeverityArg {
+    Critical,
+    High,
+    Medium,
+    Low,
+}
+
+impl MinSeverityArg {
+    fn as_severity(&self) -> Severity {
+        match self {
+            Self::Critical => Severity::Critical,
+            Self::High => Severity::High,
+            Self::Medium => Severity::Medium,
+            Self::Low => Severity::Low,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +101,13 @@ fn run(args: Args) -> Result<(), String> {
     let mode = resolve_mode(&args.mode, filename.as_deref(), &content);
     let code_rules = parse_code_rules(&args.rules)?;
 
-    let findings = gather_findings(&content, &mode, &code_rules, filename.as_deref());
+    let all_findings = gather_findings(&content, &mode, &code_rules, filename.as_deref());
+
+    let min_rank = args.min_severity.as_severity().rank();
+    let findings: Vec<Finding> = all_findings
+        .into_iter()
+        .filter(|f| f.severity.rank() >= min_rank)
+        .collect();
 
     if findings.is_empty() && !args.report {
         // Nothing to do — emit input unchanged.
@@ -258,18 +287,28 @@ fn print_report(findings: &[Finding], mode: &Mode) {
         findings.len()
     );
 
-    let mut counts: std::collections::HashMap<&str, usize> =
-        std::collections::HashMap::new();
+    // Group findings by severity in descending order
+    let severity_levels: &[(&str, Severity)] = &[
+        ("CRITICAL", Severity::Critical),
+        ("HIGH", Severity::High),
+        ("MEDIUM", Severity::Medium),
+        ("LOW", Severity::Low),
+    ];
 
-    for f in findings {
-        *counts.entry(f.message.as_str()).or_insert(0) += 1;
-    }
+    for (label, sev) in severity_levels {
+        let group: Vec<&Finding> = findings
+            .iter()
+            .filter(|f| f.severity == *sev)
+            .collect();
 
-    let mut sorted: Vec<(&&str, &usize)> = counts.iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(a.1).then(a.0.cmp(b.0)));
+        if group.is_empty() {
+            continue;
+        }
 
-    for (msg, count) in sorted {
-        eprintln!("  {:>3}x  {}", count, msg);
+        eprintln!("\n{} ({})", label, group.len());
+        for f in group {
+            eprintln!("  line {}: {} '{}'", f.line, f.message, f.matched);
+        }
     }
 }
 
@@ -324,5 +363,26 @@ mod tests {
         assert!(!cleaned.contains("utilize"), "utilize should be replaced");
         assert!(!cleaned.contains("facilitate"), "facilitate should be replaced");
         assert!(cleaned.ends_with('\n'));
+    }
+
+    #[test]
+    fn min_severity_filters_low() {
+        let findings = apply_text_rules("Certainly! In order to proceed.");
+        let min_rank = Severity::High.rank();
+        let filtered: Vec<_> = findings
+            .into_iter()
+            .filter(|f| f.severity.rank() >= min_rank)
+            .collect();
+        // "Certainly!" is Critical (rank 3 >= 2), "in order to" is Low (rank 0 < 2)
+        assert!(filtered.iter().any(|f| f.matched.to_lowercase() == "certainly!"));
+        assert!(!filtered.iter().any(|f| f.matched.to_lowercase() == "in order to"));
+    }
+
+    #[test]
+    fn min_severity_arg_converts_correctly() {
+        assert_eq!(MinSeverityArg::Critical.as_severity().rank(), 3);
+        assert_eq!(MinSeverityArg::High.as_severity().rank(), 2);
+        assert_eq!(MinSeverityArg::Medium.as_severity().rank(), 1);
+        assert_eq!(MinSeverityArg::Low.as_severity().rank(), 0);
     }
 }

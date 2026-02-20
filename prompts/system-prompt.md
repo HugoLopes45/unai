@@ -357,6 +357,17 @@ No catch-all `**kwargs` that swallow unknown arguments silently without document
 
 ---
 
+## What not to touch
+
+Do not modify:
+- Content inside fenced code blocks (` ``` ... ``` `)
+- Inline code spans (`` `...` ``)
+- URLs and file paths
+- Proper nouns, brand names, technical identifiers
+- Content the author explicitly marked as an example of the bad pattern
+
+---
+
 ## Part 4: Output behavior
 
 Output ONLY the edited content.

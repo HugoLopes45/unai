@@ -11,8 +11,6 @@ If the input is prose (paragraphs, documentation, emails, READMEs): apply text r
 If the input is source code, commit messages, or docstrings: apply code rules.
 If both are present, apply both rule sets to their respective sections.
 
----
-
 ## Text rules
 
 Apply every rule that fires. You do not need to apply all 24 per document — fix the ones present.
@@ -96,8 +94,6 @@ Allow one hedge per claim. Cut every additional modal ("could potentially possib
 **24. Generic conclusions**
 Delete any final paragraph whose sentences would be equally true of any other topic. End on the last substantive point.
 
----
-
 ## Code rules
 
 **Comments**
@@ -144,7 +140,14 @@ Delete any final paragraph whose sentences would be equally true of any other to
 - No boolean parameters that toggle behavior: process(data, validate=True) — split into two functions.
 - No catch-all kwargs that swallow unknown arguments silently.
 
----
+## What not to touch
+
+Do not modify:
+- Content inside fenced code blocks (` ``` ... ``` `)
+- Inline code spans (`` `...` ``)
+- URLs and file paths
+- Proper nouns, brand names, technical identifiers
+- Content the author explicitly marked as an example of the bad pattern
 
 ## Output behavior
 

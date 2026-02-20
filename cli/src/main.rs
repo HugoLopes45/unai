@@ -1,4 +1,5 @@
 mod detector;
+mod diff;
 mod rules;
 
 use std::fs;
@@ -9,7 +10,7 @@ use std::process;
 use clap::{Parser, ValueEnum};
 
 use detector::{detect_mode, is_commit_msg_file, Mode};
-use rules::{apply_code_rules, apply_text_rules, clean, CodeRule, Finding, Severity};
+use rules::{apply_code_rules, apply_structural_rules, apply_text_rules, clean, CodeRule, Finding, Severity};
 
 // ---------------------------------------------------------------------------
 // CLI definition
@@ -39,6 +40,10 @@ struct Args {
     /// Show what would change without modifying output.
     #[arg(long)]
     dry_run: bool,
+
+    /// Show a unified diff of changes instead of applying them.
+    #[arg(long)]
+    diff: bool,
 
     /// Show inline annotations of what was changed.
     #[arg(long)]
@@ -117,6 +122,25 @@ fn run(args: Args) -> Result<(), String> {
 
     if args.report {
         print_report(&findings, &mode);
+    }
+
+    if args.diff {
+        let cleaned = clean(&content, &findings);
+        let diff_output = diff::unified_diff(&content, &cleaned, "original", "cleaned");
+        if diff_output.is_empty() {
+            let fixable = findings.iter().filter(|f| f.replacement.is_some()).count();
+            if findings.is_empty() {
+                eprintln!("unai: no findings");
+            } else if fixable == 0 {
+                // Findings exist but none have auto-fixes; diff would always be empty.
+                eprintln!("unai: {} finding(s), none auto-fixable (run --report to see them)", findings.len());
+            } else {
+                eprintln!("unai: no changes");
+            }
+        } else {
+            print!("{}", diff_output);
+        }
+        return Ok(());
     }
 
     if args.dry_run {
@@ -198,13 +222,25 @@ fn gather_findings(
     filename: Option<&str>,
 ) -> Vec<Finding> {
     match mode {
-        Mode::Text => apply_text_rules(content),
+        Mode::Text => {
+            let mut findings = apply_text_rules(content);
+            findings.extend(apply_structural_rules(content));
+            findings
+        }
+        Mode::CommitMsg => {
+            let mut findings = apply_text_rules(content);
+            findings.extend(apply_code_rules(content, &[CodeRule::Commits]));
+            findings.extend(apply_structural_rules(content));
+            findings
+        }
         Mode::Code => {
             let mut findings = apply_code_rules(content, code_rules);
-            // When editing a commit message, ensure commit rules always fire even
-            // if the caller restricted which rules are active. Dedup by (line,col)
-            // to avoid double-reporting when code_rules is empty (all rules active).
-            if filename.map(is_commit_msg_file).unwrap_or(false) && !code_rules.is_empty() {
+            // Ensure commit rules always fire for commit message files, even when
+            // the caller restricted active rules — but avoid duplicating if already included.
+            if filename.map(is_commit_msg_file).unwrap_or(false)
+                && !code_rules.is_empty()
+                && !code_rules.contains(&CodeRule::Commits)
+            {
                 findings.extend(apply_code_rules(content, &[CodeRule::Commits]));
             }
             findings
@@ -285,6 +321,7 @@ fn print_report(findings: &[Finding], mode: &Mode) {
         match mode {
             Mode::Text => "text",
             Mode::Code => "code",
+            Mode::CommitMsg => "commit",
         },
         findings.len()
     );
@@ -365,6 +402,26 @@ mod tests {
         assert!(!cleaned.contains("utilize"), "utilize should be replaced");
         assert!(!cleaned.contains("facilitate"), "facilitate should be replaced");
         assert!(cleaned.ends_with('\n'));
+    }
+
+    #[test]
+    fn gather_findings_commit_msg_fires_commit_rules() {
+        let findings = gather_findings("wip", &Mode::CommitMsg, &[], None);
+        assert!(findings.iter().any(|f| f.message.contains("Vague commit")), "commit rules should fire for CommitMsg mode");
+    }
+
+    #[test]
+    fn gather_findings_commit_msg_fires_both_text_and_commit_rules() {
+        // Both a text tell ("utilize") and a commit tell (past tense "Added") must fire
+        let findings = gather_findings("Added utilize to the codebase", &Mode::CommitMsg, &[], None);
+        assert!(
+            findings.iter().any(|f| f.matched.to_lowercase().contains("utilize")),
+            "text rules should fire in CommitMsg mode"
+        );
+        assert!(
+            findings.iter().any(|f| f.message.contains("imperative mood")),
+            "commit past-tense rule should fire in CommitMsg mode"
+        );
     }
 
     #[test]

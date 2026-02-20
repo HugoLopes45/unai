@@ -56,5 +56,8 @@ jobs:
         with:
           workspaces: cli
 
+      - name: Remove lock file (Cargo.lock v4 is unreadable by Cargo 1.75)
+        run: rm -f cli/Cargo.lock
+
       - name: Run tests on MSRV
         run: cargo test --manifest-path cli/Cargo.toml

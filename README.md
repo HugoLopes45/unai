@@ -1,32 +1,49 @@
-# unai — a style linter for AI-characteristic writing patterns
+# unai — strip AI writing patterns from text and code
 
-You know the style. "Certainly! Here's a comprehensive overview..." Every AI
-writes like this. Every PR comment, every generated docstring, every commit
-message that says "refactor the codebase to enhance maintainability."
+You know it when you read it.
 
-`unai` flags those patterns and fixes them. Claude Code skill, Cursor rule,
-OpenCode prompt, Rust CLI. Works on prose, code comments, variable names,
-commit messages, docstrings, tests, error handling — wherever LLM-characteristic
-patterns appear.
+> "Certainly! Here's a comprehensive overview of the key considerations..."
+> "It is worth noting that this pivotal approach leverages robust methodologies."
+> "Added authentication feature to enhance security of the application."
+
+Every AI assistant writes like this. The patterns are baked in by RLHF — human raters
+reward formal-sounding text, so models overfit to words like *delve*, *meticulous*,
+*leveraging*, and openers like *Certainly!*
+
+`unai` is a CLI linter that flags and auto-fixes those patterns. Pipe text through it,
+check files, or drop it in a git hook. Works on prose, code comments, commit messages,
+docstrings, variable names — anything LLMs touch.
+
+```bash
+$ echo "Certainly! Let me delve into this comprehensive topic." | unai
+Let me explore this thorough topic.
+```
+
+---
 
 ## Install
 
-### CLI (fastest path)
+### From crates.io (recommended)
 
 ```bash
 cargo install unai
 ```
 
-Requires Rust 1.75+. Installs the `unai` binary to `~/.cargo/bin/`.
+Requires Rust 1.75+. The binary ends up at `~/.cargo/bin/unai`.
 
-Don't have Rust? Install it in one line: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+No Rust installed? One line gets it:
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Then `cargo install unai`.
 
 ### From source
 
 ```bash
 git clone https://github.com/HugoLopes45/unai
 cd unai
-make install   # cargo install --path cli/
+make install
 ```
 
 ### Claude Code skill
@@ -37,76 +54,96 @@ curl -sL https://raw.githubusercontent.com/HugoLopes45/unai/main/prompts/claude-
   > ~/.claude/skills/unai/SKILL.md
 ```
 
-Then use `/unai` in any Claude Code session to apply unai rules to the current file or selection.
+Type `/unai` in any Claude Code session. It applies the rules to the current file or selection.
 
-Or if you cloned the repo: `make install-skill`
+Or from the repo: `make install-skill`
 
 ### Cursor
 
 ```bash
-# from the repo root
-make install-cursor
+make install-cursor   # copies prompts/cursor.mdc → .cursor/rules/unai.mdc
 ```
 
-Copies `prompts/cursor.mdc` to `.cursor/rules/unai.mdc` in the current project.
-Cursor will apply the rules automatically on every generation.
-
-### OpenCode
-
-Add `prompts/opencode.md` as a rule in your OpenCode config.
+Cursor picks up the rules automatically on every generation in that project.
 
 ### Any LLM (ChatGPT, Gemini, API)
 
-Copy `prompts/system-prompt.md` into the system prompt field. That's it.
+Copy `prompts/system-prompt.md` into your system prompt. Done.
+
+---
+
+## How it works
+
+`unai` reads from a file or stdin, applies pattern rules, and writes the cleaned text to stdout.
+Diagnostics go to stderr so they don't pollute pipes.
+
+Three rule sets run depending on the input:
+
+- **Text mode** — prose patterns: sycophantic openers, LLM filler words, chatbot closers, structural tells
+- **Code mode** — code patterns: comment boilerplate, anemic naming, docstring bloat, test anti-patterns
+- **Commit mode** — triggered automatically on `COMMIT_EDITMSG` / `MERGE_MSG`: past-tense subjects, vague messages, over-long bodies
+
+Mode is detected automatically from the filename and content. You can override it with `--mode text` or `--mode code`.
 
 ---
 
 ## Usage
 
-`unai` reads from a file or stdin and writes cleaned output to stdout.
-Diagnostics (findings, reports, diffs) go to stderr so they don't pollute pipes.
-
-### Basic pipe — clean and move on
+### The basic case — clean and move on
 
 ```bash
-# replace LLM-isms in-place (auto-fixable patterns only)
+# pipe text through unai, get clean text back
 echo "Certainly! We should utilize this approach." | unai
 # → "We should use this approach."
 
-# clean a file, write result to a new file
+# clean a file
 unai draft.md > draft-clean.md
 
-# clean in-place (shell trick)
+# overwrite in place
 unai draft.md | sponge draft.md
 ```
 
-### Report mode — see what's wrong without changing anything
+Only patterns with an auto-fix get replaced. Everything else passes through unchanged.
+Use `--report` to see what was flagged but couldn't be auto-fixed.
+
+### `--report` — what's wrong and why
+
+Nothing gets changed. `unai` just tells you what it found and cites the source.
 
 ```bash
 unai --report draft.md
 unai --report < draft.md
 
-# filter to High and Critical only (less noise)
+# cut the noise — only High and Critical
 unai --report --min-severity high draft.md
 ```
 
-Output goes to stderr, grouped by severity:
 ```
-Mode: text  |  5 finding(s)
+Mode: text  |  11 finding(s)
 
 CRITICAL (2)
-  line 1: Sycophantic opener: 'Certainly!' (RLHF-induced, Juzek 2025) 'Certainly!'
-  line 3: LLM tell: 'delve' (25× excess frequency, Kobak 2025) 'delve'
+  line 1: Sycophantic opener: 'Certainly!' (RLHF-induced, Juzek 2025)
+  line 1: LLM tell: 'delve' (25× excess frequency, Kobak 2025)
 
-HIGH (2)
-  line 5: LLM filler: 'leveraging' (Kobak 2025) 'leveraging'
-  line 7: LLM filler: 'utilize' (Kobak 2025) 'utilize'
+HIGH (3)
+  line 2: LLM filler: 'leveraging' (Kobak 2025)
+  line 2: LLM tell: 'pivotal' (Kobak 2025, Liang 2024)
+  line 3: LLM cliché: 'stands as a testament' (Neri 2024)
 
-LOW (1)
-  line 9: Filler: 'in order to' 'in order to'
+MEDIUM (3)
+  line 1: LLM filler: 'comprehensive' (Kobak 2025)
+  line 2: LLM filler: 'robust' (Kobak 2025)
+  line 3: LLM filler: 'innovative' (Kobak 2025)
+
+LOW (3)
+  line 1: LLM hedge: 'it is worth noting' (Kobak 2025)
+  line 2: LLM connector: 'furthermore' (Rosenfeld 2024)
+  line 3: LLM connector: 'in conclusion' (Rosenfeld 2024)
 ```
 
-### Diff mode — preview changes as a unified diff
+Every finding links back to the corpus study that measured the excess frequency. Not vibes — data.
+
+### `--diff` — preview changes before applying them
 
 ```bash
 unai --diff draft.md
@@ -117,83 +154,115 @@ unai --diff < draft.md
 --- original
 +++ cleaned
 @@ -1,3 +1,3 @@
--Certainly! We should utilize this approach.
-+We should use this approach.
+-It is worth noting that this comprehensive approach is pivotal to our success.
+-Furthermore, leveraging these robust methodologies facilitates seamless collaboration.
++This thorough approach is key to our success.
++Using these robust methodologies facilitates collaboration.
+ In conclusion, this innovative solution stands as a testament to meticulous engineering.
 ```
 
-If a finding has no auto-fix (e.g. `meticulous` has no direct replacement), it won't appear in
-the diff but will appear in `--report`. Run both to see the full picture.
+Patterns without an auto-fix (like `meticulous`, `innovative`) won't show in the diff —
+they only appear in `--report`. Run both to see the full picture.
 
-### Annotate mode — inline markers at the point of each finding
-
-```bash
-unai --annotate draft.md
-```
-
-Prints the original text to stdout with finding annotations on stderr, positioned
-at the exact column where each pattern appears.
-
-### Dry-run mode — list changes without applying them
+### `--dry-run` — list every change before committing
 
 ```bash
 unai --dry-run draft.md
 ```
 
-Shows every auto-fixable substitution (`"utilize" → "use"`) and every non-fixable
-flag, then emits the original text unchanged. Good for reviewing before committing
-to a change.
+```
+--- Auto-fixable (4) ---
+  line  1: "utilize" → "use"  — LLM filler: 'utilize' (Kobak 2025)
+  line  2: "leveraging" → "using"  — LLM filler: 'leveraging' (Kobak 2025)
+  line  3: "facilitate" → "help"  — LLM filler: 'facilitate' (Kobak 2025)
+  line  4: "in order to" → "to"  — Filler: 'in order to'
 
-### Mode selection
-
-`unai` detects the mode automatically from the filename and content:
-
-| Mode | Triggers on | Rules applied |
-|------|-------------|---------------|
-| `text` | `.md`, `.txt`, plain prose | Word-frequency rules, sycophantic openers, chatbot closers, structural patterns |
-| `code` | `.rs`, `.py`, `.ts`, `.go`, `.js`, etc. | Comment rules, naming rules, docstring rules, test rules, error-handling rules, API rules |
-| `commit` | `COMMIT_EDITMSG`, `MERGE_MSG` | Text rules + commit-specific rules (past tense, vague subjects, over-long bodies) |
-
-Override detection with `--mode text` or `--mode code`:
-
-```bash
-# force text mode on a file with no extension
-unai --mode text < notes
-
-# force code mode on a .md file that's actually a code dump
-unai --mode code service_dump.md --report
+--- Flagged (no auto-fix) (2) ---
+  line  5: "meticulous"  — LLM tell: 'meticulous' (Kobak 2025, Neri 2024)
+  line  6: "innovative"  — LLM filler: 'innovative' (Kobak 2025, lower ratio)
 ```
 
-### Code rules — apply only a subset
+Original text is printed unchanged after the list — safe to pipe elsewhere.
 
-In code mode, all rule categories run by default. Use `--rules` to narrow:
-
-```bash
-# only naming and comment rules
-unai --mode code --rules naming,comments --report service.py
-
-# only commit message rules
-unai --mode code --rules commits --report COMMIT_EDITMSG
-```
-
-Available categories: `comments`, `naming`, `commits`, `docstrings`, `tests`, `errors`, `api`
-
-### Severity filter
+### `--annotate` — mark findings inline
 
 ```bash
-# only show Critical and High findings
-unai --report --min-severity high draft.md
-
-# only Critical
-unai --report --min-severity critical draft.md
+unai --annotate draft.md
 ```
 
-Severity levels: `critical` > `high` > `medium` > `low`
+Prints each line of the original, with finding markers on stderr at the exact column.
+Good for quickly spotting where the problems are in a longer document.
+
+### Code mode
+
+```bash
+# explicit code mode
+unai --mode code --report service.py
+
+# only flag naming and comments (skip the rest)
+unai --mode code --rules naming,comments --report service.ts
+
+# docstrings only
+unai --mode code --rules docstrings --report api.go
+```
+
+Available `--rules` values: `comments`, `naming`, `commits`, `docstrings`, `tests`, `errors`, `api`
+
+**What code mode catches:**
+
+```python
+# Before
+def getUserDataObject(userDataObject):
+    # This function serves as the core handler for processing user data
+    # Initialize the result variable to store the output
+    result = None
+    return result
+```
+
+```
+HIGH   line 2: LLM docstring boilerplate: 'this function serves as'
+MEDIUM line 1: Type-in-name anti-pattern: use 'user' instead of 'userDataObject'
+LOW    line 3: Over-explaining comment: states what the code already shows
+```
+
+### Commit message mode
+
+`unai` fires commit-specific rules automatically when the filename is `COMMIT_EDITMSG` or `MERGE_MSG`.
+
+```bash
+# check a commit message file directly
+unai --report COMMIT_EDITMSG
+
+# or pipe one through
+echo "Added new authentication feature" | unai --mode code --rules commits --report
+# HIGH: Past tense in commit subject — use imperative mood ('add' not 'added')
+```
+
+---
+
+## Severity levels
+
+| Level | Meaning | Example |
+|-------|---------|---------|
+| `critical` | Statistically extreme (r > 10×) or RLHF-specific pattern | `delve`, `Certainly!`, `feel free to` |
+| `high` | Strong corpus signal (r > 3×) or clear LLM boilerplate | `leveraging`, `pivotal`, `meticulous` |
+| `medium` | Elevated in LLM text, also common in marketing copy | `comprehensive`, `robust`, `innovative` |
+| `low` | Filler and hedging language that reads as padded | `in order to`, `moreover`, `furthermore` |
+
+Filter with `--min-severity`:
+
+```bash
+unai --report --min-severity high draft.md   # High + Critical only
+unai --report --min-severity critical post.md  # Critical only
+```
 
 ---
 
 ## Git hooks
 
-Run unai automatically on every commit message:
+Drop unai into your commit flow and catch LLM-isms before they land.
+
+**Non-blocking (report only):**
 
 ```bash
 # .git/hooks/commit-msg
@@ -201,72 +270,114 @@ Run unai automatically on every commit message:
 unai --mode code --rules commits --report --min-severity high "$1"
 ```
 
-```bash
-chmod +x .git/hooks/commit-msg
-```
-
-This flags past-tense subjects, vague messages ("wip", "fix stuff"), and over-long bodies
-before the commit lands. The hook exits 0 (non-blocking) — it reports but doesn't block.
-Change `--report` to a failing exit code if you want it to block:
+**Blocking (reject if findings exist):**
 
 ```bash
+# .git/hooks/commit-msg
 #!/bin/sh
-output=$(unai --mode code --rules commits --report --min-severity high "$1" 2>&1)
-if [ -n "$output" ]; then
-  echo "$output" >&2
+findings=$(unai --mode code --rules commits --report --min-severity high "$1" 2>&1)
+if echo "$findings" | grep -q "finding(s)"; then
+  echo "$findings" >&2
+  echo "" >&2
+  echo "Fix the commit message and try again." >&2
   exit 1
 fi
+```
+
+```bash
+chmod +x .git/hooks/commit-msg
 ```
 
 ---
 
 ## What it catches
 
-| Text | Code |
-|------|------|
-| "Certainly!", "Of course!", "Great question!" | `# Initialize the counter variable to zero` |
-| "it's worth noting", "it is important to note" | `class UserDataManager` / `processUserDataObject` |
-| "robust", "seamless", "leveraging", "comprehensive" | `# TODO: add error handling` |
-| em-dash overuse — like this — everywhere — | `assert result is not None` |
-| "In conclusion", "Moreover", "Furthermore" | `def handleUserAuthenticationRequest()` |
-| "I hope this helps! Let me know if..." | `# Step 1: validate. Step 2: process.` |
-| rule of three (innovation, iteration, and insights) | past-tense commit messages |
-| "Not only X, but also Y" | `result = ...` used for every return value |
+### Text patterns
+
+| Pattern | Severity | Source |
+|---------|----------|--------|
+| `Certainly!`, `Of course!`, `Absolutely!`, `Great question!` | Critical | Juzek 2025 (RLHF) |
+| `I'd be happy to`, `Happy to help`, `feel free to` | Critical | Juzek 2025 (RLHF) |
+| `delve`, `delves` | Critical | Kobak 2025 (r=25×) |
+| `leveraging`, `utilize`, `facilitate`, `commence` | High | Kobak 2025 |
+| `pivotal`, `meticulous`, `intricate`, `realm` | High | Kobak 2025, Liang 2024 |
+| `stands as a testament`, `tapestry` | High | Neri 2024 |
+| `comprehensive`, `robust`, `seamlessly`, `innovative` | Medium | Kobak 2025 |
+| `in order to`, `moreover`, `furthermore`, `in conclusion` | Low | Rosenfeld 2024 |
+
+### Code patterns
+
+| Pattern | Severity | Rule |
+|---------|----------|------|
+| `# This function serves as...`, `# This class represents...` | High | `docstrings` |
+| `# Initialize the X variable to Y` | Low | `comments` |
+| `UserDataManager`, `ErrorHandler`, `ProcessingHelper` | High | `naming` |
+| `userDataObject`, `configurationSettings` | Medium | `naming` |
+| `Added X` in commit subject | High | `commits` |
+| `assert result is not None` with no message | Medium | `tests` |
+| bare `except: pass` | High | `errors` |
 
 137 patterns across 9 rule files. [Browse them in `rules/`](rules/).
 
-Text rules are word-boundary aware and Unicode-safe: `"pivotale"` (French), `"pivotaler"` (German),
-`"这是pivotal决策"` (Chinese) all pass through unchanged — the match fires only when the banned word
-stands alone as a word in any script. Content inside fenced code blocks, inline backtick spans,
-and bare URL lines is never flagged.
+### What unai doesn't touch
+
+- Content inside fenced code blocks in Markdown (` ``` ` fences)
+- Inline backtick spans (`` `code` ``)
+- Bare URL lines
+- Non-English text: `"pivotale"` (French), `"pivotaler"` (German), `"这是pivotal决策"` (Chinese) — word-boundary matching is Unicode-safe, so foreign words that contain an English banned word as a substring pass through unchanged
 
 ---
 
-## Research Basis
+## Why this exists
 
-`unai`'s rules are grounded in peer-reviewed corpus studies, not intuition.
+LLMs generate the statistical median of "correct writing." That median is padded,
+over-hedged, and full of words that sound confident while saying nothing specific.
 
-**Kobak et al. (2025) — *Science Advances*** — 15 million PubMed abstracts (2010–2024)
-- `delves` is 25× more frequent in post-ChatGPT biomedical text than expected
-- `showcasing` (9.2×), `underscores` (9.1×) — empirically measured, not guessed
-- Full word list: [github.com/berenslab/llm-excess-vocab](https://github.com/berenslab/llm-excess-vocab)
-- Paper: [arXiv:2406.07016](https://arxiv.org/abs/2406.07016)
+The patterns are predictable because RLHF rewards formal-sounding text.
+*Leveraging* because business writing uses it. *Furthermore* because academic papers use it.
+*Certainly!* because it sounds agreeable to a human rater grading a response.
 
-**Liang et al. (2024) — *Nature Human Behaviour*** — 950,000+ scientific papers
-- `pivotal`, `intricate`, `showcasing`, `realm` approximately doubled post-2023
-- [arXiv:2404.01268](https://arxiv.org/abs/2404.01268)
+None of it is wrong, exactly. It just doesn't sound like a person wrote it.
+A person would say *using* instead of *leveraging*. A person's code comment
+would say `# don't touch this — it works and I don't know why` instead of
+`# This function serves as the core processing handler for user data operations`.
 
-**Juzek & Ward (COLING 2025)** — The excess vocabulary is an RLHF artifact, not a training-data artifact.
-Human raters prefer formal-sounding outputs, so fine-tuned models overfit to this vocabulary.
+`unai` draws a line. Write like yourself, not like a chatbot trying to sound helpful.
+
+---
+
+## Research basis
+
+Rules are grounded in peer-reviewed corpus studies, not intuition.
+
+**Kobak et al. (2025), *Science Advances*** — 15 million PubMed abstracts (2010–2024).
+`delves` appeared 25× more often post-ChatGPT than baseline. 280+ excess words identified,
+66% verbs, 18% adjectives. This is the core word list.
+[arXiv:2406.07016](https://arxiv.org/abs/2406.07016)
+
+**Liang et al. (2024), *Nature Human Behaviour*** — 950,000+ scientific papers.
+`pivotal`, `intricate`, `showcasing`, `realm` approximately doubled post-2023.
+[arXiv:2404.01268](https://arxiv.org/abs/2404.01268)
+
+**Juzek & Ward (COLING 2025)** — Explains *why* the vocabulary diverges: RLHF, not training data.
+Human raters prefer formal-sounding outputs. Models overfit to that preference.
 [arXiv:2412.11385](https://arxiv.org/abs/2412.11385)
 
-**Bisztray et al. (AISec 2025)** — Comment density is the #1 discriminating feature for LLM code authorship attribution. [arXiv:2506.17323](https://arxiv.org/abs/2506.17323)
+**Rosenfeld & Lazebnik (2024)** — 6 LLMs vs 13,371 NYT articles. LLMs produce less sentence
+length variation, more auxiliary verbs, fewer complex noun phrases.
+[PMC11422446](https://pmc.ncbi.nlm.nih.gov/articles/PMC11422446/)
 
-**Lopes & Klotzman (ICSE 2024)** — LLM commit messages are 20× longer than human commits.
+**Bisztray et al. (AISec 2025)** — Comment density is the #1 feature for LLM code authorship
+attribution. Removing it drops accuracy 7.2pp.
+[arXiv:2506.17323](https://arxiv.org/abs/2506.17323)
+
+**Lopes & Klotzman (ICSE 2024)** — LLM commit messages are 20× longer than human commits
+(median 381 vs 19 chars). LLM commits always include "why" explanations.
 [arXiv:2401.17622](https://arxiv.org/abs/2401.17622)
 
-This tool enforces a writing style guide. It is **not** an AI content detector — it cannot
-determine whether a document was written by an LLM. No surface-level tool can do this reliably.
+This tool is a **style linter**, not an AI detector. It cannot tell you whether a document
+was written by an LLM — no surface-level tool can do that reliably. What it can do is
+help you write in a voice that reads as distinctly human.
 
 ---
 

@@ -89,7 +89,7 @@ Cut these exactly:
 - "with that said" -> delete
 
 **23. Excessive hedging**
-Allow one hedge per claim. Cut every additional modal ("could potentially possibly be considered") and make the conditions explicit instead.
+Allow one hedge per claim. Cut every additional modal ("could potentially possibly be considered") and make the conditions explicit instead. Also cut: "could potentially" → "could", "might possibly" → "might".
 
 **24. Generic conclusions**
 Delete any final paragraph whose sentences would be equally true of any other topic. End on the last substantive point.

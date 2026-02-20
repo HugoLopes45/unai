@@ -1,5 +1,5 @@
 /// Severity level of a finding.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Severity {
     Critical,
     High,
@@ -122,21 +122,63 @@ pub fn apply_text_rules(content: &str) -> Vec<Finding> {
         }
 
         let line_lower = line.to_lowercase();
+
+        // Build a mapping from char index to byte offset in both strings so we
+        // can translate a byte position found in `line_lower` back to the
+        // corresponding byte position in `line`. `.to_lowercase()` can change
+        // byte lengths for certain Unicode characters (e.g. 'İ' → 'i̇'), so
+        // reusing `line_lower` byte offsets to slice `line` is unsafe.
+        let lower_char_bytes: Vec<usize> = {
+            let mut v = Vec::new();
+            let mut b = 0usize;
+            for c in line_lower.chars() {
+                v.push(b);
+                b += c.len_utf8();
+            }
+            v.push(b); // sentinel: one past the end
+            v
+        };
+        let orig_char_bytes: Vec<usize> = {
+            let mut v = Vec::new();
+            let mut b = 0usize;
+            for c in line.chars() {
+                v.push(b);
+                b += c.len_utf8();
+            }
+            v.push(b); // sentinel
+            v
+        };
+
+        // Convert a byte offset in `line_lower` to a char index.
+        let lower_byte_to_char = |byte: usize| -> Option<usize> {
+            lower_char_bytes.iter().position(|&b| b == byte)
+        };
+
         for rule in TEXT_RULES {
             let mut search_start = 0usize;
             while let Some(pos) = line_lower[search_start..].find(rule.needle) {
-                let col = search_start + pos;
-                let end = col + rule.needle.len();
-                // Require word boundaries: char before must not be alphanumeric,
-                // char after must not be alphanumeric (handles inflections like
-                // "pivotale", "delves", "commencement").
-                if !is_word_boundary(&line_lower, col, end) {
-                    search_start = end;
+                let col_lower = search_start + pos;
+                let end_lower = col_lower + rule.needle.len();
+                // Require word boundaries on `line_lower` (same char semantics).
+                if !is_word_boundary(&line_lower, col_lower, end_lower) {
+                    search_start = end_lower;
                     continue;
                 }
-                // Skip matches inside inline backtick spans.
+                // Map byte offsets from `line_lower` back to `line`.
+                let (col, end) = match (
+                    lower_byte_to_char(col_lower),
+                    lower_byte_to_char(end_lower),
+                ) {
+                    (Some(ci), Some(ei)) => (orig_char_bytes[ci], orig_char_bytes[ei]),
+                    _ => {
+                        // Offset doesn't align to a char boundary — skip safely.
+                        search_start = end_lower;
+                        continue;
+                    }
+                };
+                // Skip matches inside inline backtick spans (using `line` offsets).
                 if is_in_backtick_span(line, col, end) {
-                    search_start = end;
+                    search_start = end_lower;
                     continue;
                 }
                 let matched = &line[col..end];
@@ -146,9 +188,9 @@ pub fn apply_text_rules(content: &str) -> Vec<Finding> {
                     matched: matched.to_string(),
                     message: rule.message.to_string(),
                     replacement: rule.replacement.map(str::to_string),
-                    severity: rule.severity.clone(),
+                    severity: rule.severity,
                 });
-                search_start = end;
+                search_start = end_lower;
             }
         }
     }
@@ -181,9 +223,11 @@ fn is_word_boundary(line: &str, start: usize, end: usize) -> bool {
     before_ok && after_ok
 }
 
-/// Returns `true` if byte range `[start, end)` falls inside an inline backtick span.
-fn is_in_backtick_span(line: &str, start: usize, _end: usize) -> bool {
-    let mut inside = false;
+/// Returns `true` if the entire byte range `[start, end)` falls inside a single
+/// inline backtick span. Both `start` and `end` must be byte offsets into `line`.
+/// The toggle fires *before* the position check so that the backtick character
+/// itself is not considered "inside" the span — ordering must not be changed.
+fn is_in_backtick_span(line: &str, start: usize, end: usize) -> bool {
     let chars: Vec<char> = line.chars().collect();
     let mut char_byte_positions: Vec<usize> = Vec::with_capacity(chars.len());
     {
@@ -193,16 +237,29 @@ fn is_in_backtick_span(line: &str, start: usize, _end: usize) -> bool {
             pos += c.len_utf8();
         }
     }
-    let mut i = 0usize;
-    while i < chars.len() {
-        let byte_pos = char_byte_positions[i];
+    // Determine whether `start` is inside a backtick span.
+    let mut inside = false;
+    for (i, &byte_pos) in char_byte_positions.iter().enumerate() {
         if chars[i] == '`' {
             inside = !inside;
         }
         if byte_pos >= start {
-            return inside && chars[i] != '`';
+            let start_inside = inside && chars[i] != '`';
+            if !start_inside {
+                return false;
+            }
+            // Also verify `end` is still inside the same span (no closing backtick
+            // between start and end).
+            for j in (i + 1)..chars.len() {
+                if char_byte_positions[j] >= end {
+                    return true;
+                }
+                if chars[j] == '`' {
+                    return false; // closing backtick before end — straddles boundary
+                }
+            }
+            return true;
         }
-        i += 1;
     }
     false
 }
@@ -302,7 +359,7 @@ pub fn apply_code_rules(content: &str, enabled: &[CodeRule]) -> Vec<Finding> {
                 if line_lower.contains(phrase) {
                     findings.push(Finding {
                         line: lineno,
-                        col: line_lower.find(phrase).unwrap_or(0),
+                        col: line_lower.find(phrase).expect("contains() guarantees find() succeeds"),
                         matched: phrase.to_string(),
                         message: format!("LLM docstring boilerplate: '{phrase}'"),
                         replacement: None,
@@ -314,7 +371,7 @@ pub fn apply_code_rules(content: &str, enabled: &[CodeRule]) -> Vec<Finding> {
 
         // Naming rules
         if all || enabled.contains(&CodeRule::Naming) {
-            check_naming(trimmed, lineno, &mut findings);
+            check_naming(line, lineno, &mut findings);
         }
 
         // Commit message patterns (applied when rule is active, e.g. COMMIT_EDITMSG)
@@ -461,7 +518,7 @@ fn check_naming(line: &str, lineno: usize, findings: &mut Vec<Finding>) {
         if line_lower.contains(&bad.to_lowercase()) {
             findings.push(Finding {
                 line: lineno,
-                col: line_lower.find(&bad.to_lowercase()).unwrap_or(0),
+                col: line_lower.find(&bad.to_lowercase()).expect("contains() guarantees find() succeeds"),
                 matched: bad.to_string(),
                 message: format!("Type-in-name anti-pattern: use '{}' instead", suggestion),
                 replacement: None, // naming changes require manual review — no auto-fix
@@ -512,7 +569,7 @@ fn check_commit_patterns(line: &str, lineno: usize, findings: &mut Vec<Finding>)
         if lower.contains(phrase) {
             findings.push(Finding {
                 line: lineno,
-                col: lower.find(phrase).unwrap_or(0),
+                col: lower.find(phrase).expect("contains() guarantees find() succeeds"),
                 matched: phrase.to_string(),
                 message: format!("Vague commit message: '{}'", phrase),
                 replacement: None,
@@ -520,78 +577,6 @@ fn check_commit_patterns(line: &str, lineno: usize, findings: &mut Vec<Finding>)
             });
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Apply findings as fixes
-// ---------------------------------------------------------------------------
-
-/// Apply all auto-fixable findings to the content, returning the cleaned string.
-#[allow(dead_code)]
-pub fn apply_fixes(content: &str, findings: &[Finding]) -> String {
-    // Build a map of (line, col, matched) -> replacement, deduplicated.
-    // We process findings in reverse line order so that replacements on the
-    // same line don't shift offsets for earlier findings.
-    let mut lines: Vec<String> = content.lines().map(str::to_string).collect();
-
-    // Group fixable findings by line (1-based), process each line independently.
-    let mut by_line: std::collections::HashMap<usize, Vec<&Finding>> =
-        std::collections::HashMap::new();
-
-    for f in findings {
-        if f.replacement.is_some() {
-            by_line.entry(f.line).or_default().push(f);
-        }
-    }
-
-    for (lineno, line_findings) in &by_line {
-        let idx = lineno - 1;
-        if idx >= lines.len() {
-            continue;
-        }
-        let mut line = lines[idx].clone();
-        // Sort findings by col descending so replacements don't shift earlier offsets.
-        let mut sorted = line_findings.clone();
-        sorted.sort_by(|a, b| b.col.cmp(&a.col));
-
-        for f in sorted {
-            if let Some(ref replacement) = f.replacement {
-                let end = f.col + f.matched.len();
-                if end <= line.len() {
-                    // Preserve original casing style for single-word replacements
-                    let original = &line[f.col..end];
-                    let fixed = apply_case(original, replacement);
-                    line = format!("{}{}{}", &line[..f.col], fixed, &line[end..]);
-                }
-            }
-        }
-
-        lines[idx] = line;
-    }
-
-    // Remove lines that were replaced with empty string (tautological comments)
-    let result: Vec<String> = lines
-        .into_iter()
-        .zip(
-            {
-                let mut empty_lines = std::collections::HashSet::new();
-                for f in findings {
-                    if f.replacement.as_deref() == Some("") {
-                        empty_lines.insert(f.line);
-                    }
-                }
-                empty_lines
-            }
-            .into_iter()
-            .collect::<std::collections::HashSet<usize>>()
-            .into_iter()
-            .collect::<std::collections::HashSet<usize>>(),
-        )
-        .map(|(line, _)| line)
-        .collect();
-
-    // Simpler approach: collect empty-line targets, then filter
-    result.join("\n")
 }
 
 /// Produce a cleaned version of content, removing empty-replacement lines and
@@ -874,16 +859,14 @@ mod challenge_tests {
     }
 
     // --- Case ---
-    #[test] fn all_caps_utilize_unchanged() {
-        // UTILIZE doesn't match because needle is lowercase and we match on line_lower,
-        // but replacement target is the original — verify it gets replaced or not
+    #[test] fn all_caps_utilize_known_behaviour() {
+        // Known limitation: apply_case only uppercases the first character of the
+        // replacement. "UTILIZE" -> apply_case("UTILIZE", "use") -> "Use".
+        // Full-caps preservation is not implemented.
         let input = "UTILIZE this.";
         let f = apply_text_rules(input);
         let cleaned = clean(input, &f);
-        // It WILL match (case-insensitive), replacement should preserve case
-        // "UTILIZE" -> apply_case("UTILIZE", "use") -> "Use" (only first char uppercased)
-        // This is a known limitation — document it, don't hide it
-        println!("UTILIZE result: {}", cleaned);
+        assert_eq!(cleaned, "Use this.", "all-caps: first char uppercased, rest from replacement");
     }
 
     // --- Multiple banned words same line ---

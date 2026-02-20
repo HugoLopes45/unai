@@ -76,12 +76,17 @@ unai response.md
 # report mode — see what's wrong without changing it
 unai --report < draft.md
 
+# filter by severity (critical, high, medium, low)
+unai --report --min-severity high < draft.md
+
 # code mode — flag naming, comments, docstrings
 cat service.py | unai --mode code --report
 
 # annotate mode — marks each finding inline
 unai --annotate < file.ts
 ```
+
+Text rules are word-boundary aware: `"pivotale"` (French) and `"commencement"` pass through unchanged. Content inside fenced code blocks, inline backtick spans, and bare URL lines is never flagged.
 
 ## Why this exists
 

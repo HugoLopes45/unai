@@ -490,9 +490,16 @@ pub fn apply_text_rules(content: &str) -> Vec<Finding> {
             v
         };
 
-        // Convert a byte offset in `line_lower` to a char index.
-        let lower_byte_to_char =
-            |byte: usize| -> Option<usize> { lower_char_bytes.iter().position(|&b| b == byte) };
+        // Convert a byte offset in `line_lower` to a char index using binary
+        // search — O(log n) per call instead of the O(n) linear scan.
+        let lower_byte_to_char = |byte: usize| -> Option<usize> {
+            let i = lower_char_bytes.partition_point(|&b| b < byte);
+            if lower_char_bytes.get(i) == Some(&byte) {
+                Some(i)
+            } else {
+                None
+            }
+        };
 
         for rule in TEXT_RULES {
             let mut search_start = 0usize;
@@ -604,8 +611,8 @@ fn is_in_backtick_span(line: &str, start: usize, end: usize) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::clean;
+    use super::*;
 
     #[test]
     fn finds_utilize() {
@@ -735,8 +742,8 @@ mod tests {
 
 #[cfg(test)]
 mod challenge_tests {
-    use super::*;
     use super::super::clean;
+    use super::*;
 
     // --- Word boundary: substrings ---
     #[test]

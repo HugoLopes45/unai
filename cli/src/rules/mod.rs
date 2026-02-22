@@ -10,12 +10,10 @@ pub use structural::apply_structural_rules;
 pub use text::apply_text_rules;
 pub(crate) use text::is_word_boundary;
 
-
 /// Apply user-defined rules from `cfg` to `content`, returning findings.
-/// Searches case-insensitively (needle = pattern.to_lowercase()) and uses the
-/// lowercase-string offsets directly for slicing — safe because needles are
-/// expected to be ASCII patterns. Word boundaries are checked on the lowercased
-/// line to stay consistent with built-in text rules.
+/// Searches case-insensitively (needle = pattern.to_lowercase()). Byte offsets
+/// stored in `Finding.col` are always relative to the *original* line so that
+/// `clean()` and JSON consumers can safely slice the original text.
 pub fn apply_user_rules(content: &str, cfg: Option<&crate::config::Config>) -> Vec<Finding> {
     let Some(cfg) = cfg else { return vec![] };
     let mut findings = Vec::new();
@@ -32,28 +30,67 @@ pub fn apply_user_rules(content: &str, cfg: Option<&crate::config::Config>) -> V
         };
         for (line_idx, line) in content.lines().enumerate() {
             let line_lower = line.to_lowercase();
+
+            // Build char-index → byte-offset tables for both strings so we can
+            // map a byte position found in `line_lower` back to the corresponding
+            // byte position in `line`. `.to_lowercase()` can change byte lengths
+            // for certain Unicode characters (e.g. 'İ' → 'i̇').
+            let lower_char_bytes: Vec<usize> = {
+                let mut v = Vec::new();
+                let mut b = 0usize;
+                for c in line_lower.chars() {
+                    v.push(b);
+                    b += c.len_utf8();
+                }
+                v.push(b);
+                v
+            };
+            let orig_char_bytes: Vec<usize> = {
+                let mut v = Vec::new();
+                let mut b = 0usize;
+                for c in line.chars() {
+                    v.push(b);
+                    b += c.len_utf8();
+                }
+                v.push(b);
+                v
+            };
+            // Binary search: convert a byte offset in `line_lower` to a char index.
+            let lower_byte_to_char = |byte: usize| -> Option<usize> {
+                let i = lower_char_bytes.partition_point(|&b| b < byte);
+                if lower_char_bytes.get(i) == Some(&byte) { Some(i) } else { None }
+            };
+
             let mut start = 0;
             while let Some(pos) = line_lower[start..].find(&needle) {
-                let col = start + pos;
-                let end = col + needle.len();
-                if is_word_boundary(&line_lower, col, end) {
-                    // Use needle.len() (not rule.pattern.len()) for the slice so that
-                    // if to_lowercase changed byte length (e.g. Turkish İ) we slice
-                    // line_lower consistently. The matched text is taken from line_lower
-                    // to guarantee correct byte offsets.
-                    let matched = line_lower[col..end].to_string();
+                let col_lower = start + pos;
+                let end_lower = col_lower + needle.len();
+                if is_word_boundary(&line_lower, col_lower, end_lower) {
+                    // Map offsets from `line_lower` back to `line`.
+                    let (col, end) = match (
+                        lower_byte_to_char(col_lower),
+                        lower_byte_to_char(end_lower),
+                    ) {
+                        (Some(ci), Some(ei)) => (orig_char_bytes[ci], orig_char_bytes[ei]),
+                        _ => {
+                            start = end_lower;
+                            continue;
+                        }
+                    };
+                    let matched = line[col..end].to_string();
                     findings.push(Finding {
                         line: line_idx + 1,
                         col,
                         matched,
-                        message: rule.message.clone().unwrap_or_else(|| {
-                            format!("User rule: '{}'", rule.pattern)
-                        }),
+                        message: rule
+                            .message
+                            .clone()
+                            .unwrap_or_else(|| format!("User rule: '{}'", rule.pattern)),
                         replacement: rule.replacement.clone(),
                         severity,
                     });
                 }
-                start = end;
+                start = end_lower;
             }
         }
     }
@@ -109,7 +146,9 @@ pub fn clean(content: &str, findings: &[Finding]) -> String {
 
     for f in findings {
         // f.line is 1-based; skip malformed findings with line == 0.
-        let Some(idx) = f.line.checked_sub(1) else { continue };
+        let Some(idx) = f.line.checked_sub(1) else {
+            continue;
+        };
         if idx >= lines.len() {
             continue;
         }
@@ -157,7 +196,11 @@ pub fn clean(content: &str, findings: &[Finding]) -> String {
         .iter()
         .enumerate()
         .filter_map(|(idx, line)| {
-            if drop_lines.contains(&idx) { None } else { Some(line.as_str()) }
+            if drop_lines.contains(&idx) {
+                None
+            } else {
+                Some(line.as_str())
+            }
         })
         .collect::<Vec<_>>()
         .join("\n");
@@ -206,7 +249,10 @@ mod tests {
     fn clean_skips_finding_with_line_zero() {
         let f = make_finding(0, 0, "x", Some("y"));
         let result = clean("hello\n", &[f]);
-        assert_eq!(result, "hello\n", "line-zero finding must be skipped, not panic");
+        assert_eq!(
+            result, "hello\n",
+            "line-zero finding must be skipped, not panic"
+        );
     }
 
     // A finding with col beyond line length must be skipped gracefully, not panic.
@@ -214,13 +260,16 @@ mod tests {
     fn clean_skips_finding_with_out_of_bounds_col() {
         let f = make_finding(1, 100, "x", Some("y"));
         let result = clean("hello\n", &[f]);
-        assert_eq!(result, "hello\n", "out-of-bounds col must be skipped, not panic");
+        assert_eq!(
+            result, "hello\n",
+            "out-of-bounds col must be skipped, not panic"
+        );
     }
 
     // Multiple non-overlapping matches on the same line must all be reported.
     #[test]
     fn apply_user_rules_finds_multiple_matches_same_line() {
-        use crate::config::{Config, UserRule, IgnoreConfig};
+        use crate::config::{Config, IgnoreConfig, UserRule};
         let cfg = Config {
             version: 1,
             rules: vec![UserRule {
@@ -233,14 +282,19 @@ mod tests {
             ignore: IgnoreConfig::default(),
         };
         let findings = apply_user_rules("ab ab ab", Some(&cfg));
-        assert_eq!(findings.len(), 3, "three non-overlapping 'ab' matches expected, got {}", findings.len());
+        assert_eq!(
+            findings.len(),
+            3,
+            "three non-overlapping 'ab' matches expected, got {}",
+            findings.len()
+        );
     }
 
     // The search cursor advances past each match (start = end), so a long line with many
     // matches must terminate in bounded time.
     #[test]
     fn apply_user_rules_terminates_on_repeated_pattern() {
-        use crate::config::{Config, UserRule, IgnoreConfig};
+        use crate::config::{Config, IgnoreConfig, UserRule};
         let cfg = Config {
             version: 1,
             rules: vec![UserRule {

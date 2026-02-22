@@ -8,8 +8,6 @@ If the input is prose (paragraphs, documentation, emails, READMEs): apply text r
 If the input is source code, commit messages, or docstrings: apply code rules.
 If both are present, apply both rule sets to their respective sections.
 
----
-
 ## Text rules
 
 Apply every rule that fires. You do not need to apply all 24 per document — fix the ones present.
@@ -88,12 +86,10 @@ Cut these exactly:
 - "with that said" -> delete
 
 **23. Excessive hedging**
-Allow one hedge per claim. Cut every additional modal ("could potentially possibly be considered") and make the conditions explicit instead.
+Allow one hedge per claim. Cut every additional modal ("could potentially possibly be considered") and make the conditions explicit instead. Also cut: "could potentially" → "could", "might possibly" → "might".
 
 **24. Generic conclusions**
 Delete any final paragraph whose sentences would be equally true of any other topic. End on the last substantive point.
-
----
 
 ## Code rules
 
@@ -106,7 +102,7 @@ Delete any final paragraph whose sentences would be equally true of any other to
 
 **Naming**
 - Remove type-narrating suffixes: userDataObject -> user, configurationSettings -> config, errorMessageString -> msg, listOfUsers -> users.
-- Remove lifecycle suffixes: initialUserData -> user.
+- Remove lifecycle suffixes: initialUserData -> user, processedResult -> result is still bad — name the actual concept.
 - Replace generic names: result, data, info, manager, handler, helper, util, service (as a suffix alone) — name what the variable actually holds or what the class actually does.
 - Remove redundant context repetition: in a User class, user_name -> name, user_email -> email.
 
@@ -129,18 +125,26 @@ Delete any final paragraph whose sentences would be equally true of any other to
   - Bad: test_calculate, test_user_service_method
   - Good: test_expired_token_returns_401, test_empty_cart_skips_checkout
 - No "# Arrange / Act / Assert" section headers.
-- No "# Test that X does Y" comments before the assertion.
+- No "# Test that X does Y" comments before the assertion. The assertion is the documentation.
 
 **Error handling**
 - Error messages name the cause, not the symptom: "user_id missing from session" not "an error occurred".
-- No "An unexpected error occurred. Please try again later."
+- No "An unexpected error occurred. Please try again later." — name what failed.
 - Exception variable names: e, err, exc — not caught_exception, error_object.
 
 **API and interface design**
+- No getter prefix on functions that return a value directly: get_user(id) -> user(id) where the context makes it clear.
 - No boolean parameters that toggle behavior: process(data, validate=True) — split into two functions.
 - No catch-all kwargs that swallow unknown arguments silently.
 
----
+## What not to touch
+
+Do not modify:
+- Content inside fenced code blocks (` ``` ... ``` `)
+- Inline code spans (`` `...` ``)
+- URLs and file paths
+- Proper nouns, brand names, technical identifiers
+- Content the author explicitly marked as an example of the bad pattern
 
 ## Output behavior
 

@@ -58,7 +58,11 @@ pub fn apply_user_rules(content: &str, cfg: Option<&crate::config::Config>) -> V
             // Binary search: convert a byte offset in `line_lower` to a char index.
             let lower_byte_to_char = |byte: usize| -> Option<usize> {
                 let i = lower_char_bytes.partition_point(|&b| b < byte);
-                if lower_char_bytes.get(i) == Some(&byte) { Some(i) } else { None }
+                if lower_char_bytes.get(i) == Some(&byte) {
+                    Some(i)
+                } else {
+                    None
+                }
             };
 
             let mut start = 0;
@@ -67,16 +71,14 @@ pub fn apply_user_rules(content: &str, cfg: Option<&crate::config::Config>) -> V
                 let end_lower = col_lower + needle.len();
                 if is_word_boundary(&line_lower, col_lower, end_lower) {
                     // Map offsets from `line_lower` back to `line`.
-                    let (col, end) = match (
-                        lower_byte_to_char(col_lower),
-                        lower_byte_to_char(end_lower),
-                    ) {
-                        (Some(ci), Some(ei)) => (orig_char_bytes[ci], orig_char_bytes[ei]),
-                        _ => {
-                            start = end_lower;
-                            continue;
-                        }
-                    };
+                    let (col, end) =
+                        match (lower_byte_to_char(col_lower), lower_byte_to_char(end_lower)) {
+                            (Some(ci), Some(ei)) => (orig_char_bytes[ci], orig_char_bytes[ei]),
+                            _ => {
+                                start = end_lower;
+                                continue;
+                            }
+                        };
                     let matched = line[col..end].to_string();
                     findings.push(Finding {
                         line: line_idx + 1,

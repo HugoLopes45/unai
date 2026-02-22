@@ -26,7 +26,7 @@ pub enum UnaiError {
     ConfigParse {
         path: PathBuf,
         #[source]
-        source: toml::de::Error,
+        source: Box<toml::de::Error>,
     },
 
     #[error("Invalid config: {0}")]

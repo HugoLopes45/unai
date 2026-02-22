@@ -60,7 +60,7 @@ impl Config {
             })?;
         let config: Config = toml::from_str(&content).map_err(|source| UnaiError::ConfigParse {
             path: path.into(),
-            source,
+            source: Box::new(source),
         })?;
         config.validate()?;
         Ok(config)

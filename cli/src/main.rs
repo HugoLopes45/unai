@@ -123,6 +123,14 @@ impl MinSeverityArg {
     }
 }
 
+/// Output of the findings pipeline, passed to `render()`.
+struct PipelineResult {
+    findings: Vec<Finding>,
+    mode: Mode,
+    content: String,
+    filename: Option<String>,
+}
+
 #[derive(serde::Serialize)]
 struct JsonReport {
     version: &'static str,
@@ -170,22 +178,10 @@ fn build_json_report(findings: &[Finding], mode: &Mode, filename: Option<&str>) 
 
     let summary = JsonSummary {
         total: findings.len(),
-        critical: findings
-            .iter()
-            .filter(|f| f.severity == Severity::Critical)
-            .count(),
-        high: findings
-            .iter()
-            .filter(|f| f.severity == Severity::High)
-            .count(),
-        medium: findings
-            .iter()
-            .filter(|f| f.severity == Severity::Medium)
-            .count(),
-        low: findings
-            .iter()
-            .filter(|f| f.severity == Severity::Low)
-            .count(),
+        critical: count_by_severity(findings, Severity::Critical),
+        high: count_by_severity(findings, Severity::High),
+        medium: count_by_severity(findings, Severity::Medium),
+        low: count_by_severity(findings, Severity::Low),
     };
 
     JsonReport {
@@ -195,6 +191,10 @@ fn build_json_report(findings: &[Finding], mode: &Mode, filename: Option<&str>) 
         findings: json_findings,
         summary,
     }
+}
+
+fn count_by_severity(findings: &[Finding], sev: Severity) -> usize {
+    findings.iter().filter(|f| f.severity == sev).count()
 }
 
 fn mode_label(mode: &Mode) -> &'static str {
@@ -256,7 +256,9 @@ fn main() {
     }
 }
 
-fn run(args: Args) -> Result<bool> {
+/// Orchestrates the findings pipeline: read input, detect mode, gather and filter findings.
+/// Returns structured data; performs no output.
+fn pipeline(args: &Args) -> Result<PipelineResult> {
     let cfg = match &args.config {
         Some(path) => Some(config::Config::load(std::path::Path::new(path))?),
         None => config::Config::load_from_cwd()?,
@@ -284,70 +286,126 @@ fn run(args: Args) -> Result<bool> {
         .filter(|f| f.severity.rank() >= min_rank)
         .collect();
 
-    let use_color = match args.color {
-        ColorArg::Always => true,
-        ColorArg::Never => false,
-        ColorArg::Auto => std::io::stderr().is_terminal(),
-    };
+    Ok(PipelineResult {
+        findings,
+        mode,
+        content,
+        filename,
+    })
+}
 
-    let had_findings = !findings.is_empty();
+enum Formatter {
+    Text,
+    Json,
+}
 
-    if args.format == FormatArg::Json {
-        let report = build_json_report(&findings, &mode, filename.as_deref());
-        let json = serde_json::to_string_pretty(&report).map_err(|e| UnaiError::FileWrite {
-            path: args.output.as_deref().unwrap_or("<stdout>").into(),
-            source: std::io::Error::other(e.to_string()),
-        })?;
-        write_output(&json, args.output.as_deref())?;
-        return Ok(had_findings);
-    }
-
-    if !had_findings && !args.report {
-        // Nothing to do — emit input unchanged.
-        write_output(&content, args.output.as_deref())?;
-        return Ok(false);
-    }
-
-    if args.report {
-        print_report(&findings, &mode, use_color);
-    }
-
-    if args.diff {
-        let cleaned = clean(&content, &findings);
-        let diff_output = diff::unified_diff(&content, &cleaned, "original", "cleaned");
-        if diff_output.is_empty() {
-            let fixable = findings.iter().filter(|f| f.replacement.is_some()).count();
-            if !had_findings {
-                eprintln!("unai: no findings");
-            } else if fixable == 0 {
-                eprintln!(
-                    "unai: {} finding(s), none auto-fixable (run --report to see them)",
-                    findings.len()
-                );
-            } else {
-                eprintln!("unai: no changes");
-            }
-        } else {
-            write_output(&diff_output, args.output.as_deref())?;
-            return Ok(had_findings);
+impl Formatter {
+    fn from_args(args: &Args) -> Self {
+        match args.format {
+            FormatArg::Json => Formatter::Json,
+            FormatArg::Text => Formatter::Text,
         }
-        return Ok(had_findings);
     }
 
-    if args.dry_run {
-        print_dry_run(&content, &findings);
-        return Ok(had_findings);
-    }
+    fn render(&self, result: PipelineResult, args: &Args) -> Result<bool> {
+        match self {
+            Formatter::Json => {
+                let PipelineResult {
+                    findings,
+                    mode,
+                    filename,
+                    ..
+                } = result;
+                let had_findings = !findings.is_empty();
+                let report = build_json_report(&findings, &mode, filename.as_deref());
+                let json =
+                    serde_json::to_string_pretty(&report).map_err(|e| UnaiError::FileWrite {
+                        path: args.output.as_deref().unwrap_or("<stdout>").into(),
+                        source: std::io::Error::other(e.to_string()),
+                    })?;
+                write_output(&json, args.output.as_deref())?;
+                Ok(had_findings)
+            }
+            Formatter::Text => {
+                let PipelineResult {
+                    findings,
+                    mode,
+                    content,
+                    ..
+                } = result;
+                let had_findings = !findings.is_empty();
+                let use_color = match args.color {
+                    ColorArg::Always => true,
+                    ColorArg::Never => false,
+                    ColorArg::Auto => std::io::stderr().is_terminal(),
+                };
 
-    if args.annotate {
-        print_annotated(&content, &findings);
-        return Ok(had_findings);
-    }
+                if !had_findings && !args.report {
+                    write_output(&content, args.output.as_deref())?;
+                    return Ok(false);
+                }
 
-    // Default: emit cleaned output for piping
-    let cleaned = clean(&content, &findings);
-    write_output(&cleaned, args.output.as_deref())?;
+                if args.report {
+                    print_report(&findings, &mode, use_color);
+                }
+
+                if args.diff {
+                    return render_diff(&content, &findings, had_findings, args.output.as_deref());
+                }
+
+                if args.dry_run {
+                    print_dry_run(&content, &findings);
+                    return Ok(had_findings);
+                }
+
+                if args.annotate {
+                    print_annotated(&content, &findings);
+                    return Ok(had_findings);
+                }
+
+                let cleaned = clean(&content, &findings);
+                write_output(&cleaned, args.output.as_deref())?;
+                Ok(had_findings)
+            }
+        }
+    }
+}
+
+fn render_diff(
+    content: &str,
+    findings: &[Finding],
+    had_findings: bool,
+    output: Option<&str>,
+) -> Result<bool> {
+    let cleaned = clean(content, findings);
+    let diff_output = diff::unified_diff(content, &cleaned, "original", "cleaned");
+    if diff_output.is_empty() {
+        let fixable = findings.iter().filter(|f| f.replacement.is_some()).count();
+        if !had_findings {
+            eprintln!("unai: no findings");
+        } else if fixable == 0 {
+            eprintln!(
+                "unai: {} finding(s), none auto-fixable (run --report to see them)",
+                findings.len()
+            );
+        } else {
+            eprintln!("unai: no changes");
+        }
+    } else {
+        write_output(&diff_output, output)?;
+    }
     Ok(had_findings)
+}
+
+/// Dispatches to the appropriate output function based on args.
+/// Returns true if any findings were present.
+fn render(result: PipelineResult, args: &Args) -> Result<bool> {
+    Formatter::from_args(args).render(result, args)
+}
+
+fn run(args: Args) -> Result<bool> {
+    let result = pipeline(&args)?;
+    render(result, &args)
 }
 
 fn read_input(file_arg: &Option<String>) -> Result<(String, Option<String>)> {
@@ -571,6 +629,75 @@ fn print_report(findings: &[Finding], mode: &Mode, color: bool) {
 mod tests {
     use super::*;
 
+    // RED → GREEN: pipeline() isolated from rendering — verifies findings are returned
+    // without any output side effects.
+    #[test]
+    fn pipeline_returns_findings_without_rendering() {
+        let dir = tempfile::tempdir().unwrap();
+        let input_path = dir.path().join("input.txt");
+        std::fs::write(&input_path, "We should utilize this.\n").unwrap();
+
+        let args = Args {
+            file: Some(input_path.to_str().unwrap().to_string()),
+            mode: ModeArg::Text,
+            rules: vec![],
+            dry_run: false,
+            diff: false,
+            annotate: false,
+            report: false,
+            min_severity: MinSeverityArg::Low,
+            format: FormatArg::Text,
+            output: None,
+            config: None,
+            fail: false,
+            color: ColorArg::Never,
+        };
+
+        let result = pipeline(&args).unwrap();
+        assert_eq!(result.mode, Mode::Text);
+        assert!(
+            result
+                .findings
+                .iter()
+                .any(|f| f.matched.to_lowercase().contains("utilize")),
+            "pipeline should surface the 'utilize' finding"
+        );
+        assert!(
+            result.content.contains("utilize"),
+            "content is original unmodified input"
+        );
+        assert!(result.filename.is_some());
+    }
+
+    #[test]
+    fn pipeline_no_findings_on_clean_input() {
+        let dir = tempfile::tempdir().unwrap();
+        let input_path = dir.path().join("clean.txt");
+        std::fs::write(&input_path, "The sky is blue.\n").unwrap();
+
+        let args = Args {
+            file: Some(input_path.to_str().unwrap().to_string()),
+            mode: ModeArg::Text,
+            rules: vec![],
+            dry_run: false,
+            diff: false,
+            annotate: false,
+            report: false,
+            min_severity: MinSeverityArg::Low,
+            format: FormatArg::Text,
+            output: None,
+            config: None,
+            fail: false,
+            color: ColorArg::Never,
+        };
+
+        let result = pipeline(&args).unwrap();
+        assert!(
+            result.findings.is_empty(),
+            "clean prose should produce no findings"
+        );
+    }
+
     #[test]
     #[cfg(unix)]
     fn write_output_refuses_symlink() {
@@ -695,5 +822,151 @@ mod tests {
         assert_eq!(MinSeverityArg::High.as_severity().rank(), 2);
         assert_eq!(MinSeverityArg::Medium.as_severity().rank(), 1);
         assert_eq!(MinSeverityArg::Low.as_severity().rank(), 0);
+    }
+
+    fn make_finding(severity: Severity) -> Finding {
+        Finding {
+            line: 1,
+            col: 0,
+            matched: "x".to_string(),
+            message: "test".to_string(),
+            replacement: None,
+            severity,
+        }
+    }
+
+    #[test]
+    fn count_by_severity_counts_correctly() {
+        let findings = vec![
+            make_finding(Severity::Critical),
+            make_finding(Severity::Critical),
+            make_finding(Severity::High),
+        ];
+        assert_eq!(count_by_severity(&findings, Severity::Critical), 2);
+        assert_eq!(count_by_severity(&findings, Severity::High), 1);
+        assert_eq!(count_by_severity(&findings, Severity::Low), 0);
+    }
+
+    // --- Formatter dispatch (OCP) ---
+
+    fn make_pipeline_result(content: &str, findings: Vec<Finding>) -> PipelineResult {
+        PipelineResult {
+            findings,
+            mode: Mode::Text,
+            content: content.to_string(),
+            filename: None,
+        }
+    }
+
+    fn json_args() -> Args {
+        Args {
+            file: None,
+            mode: ModeArg::Text,
+            rules: vec![],
+            dry_run: false,
+            diff: false,
+            annotate: false,
+            report: false,
+            min_severity: MinSeverityArg::Low,
+            format: FormatArg::Json,
+            output: None,
+            config: None,
+            fail: false,
+            color: ColorArg::Never,
+        }
+    }
+
+    fn text_args() -> Args {
+        Args {
+            file: None,
+            mode: ModeArg::Text,
+            rules: vec![],
+            dry_run: false,
+            diff: false,
+            annotate: false,
+            report: false,
+            min_severity: MinSeverityArg::Low,
+            format: FormatArg::Text,
+            output: None,
+            config: None,
+            fail: false,
+            color: ColorArg::Never,
+        }
+    }
+
+    #[test]
+    fn formatter_json_produces_valid_json() {
+        // Construct Formatter::Json directly — verifies the variant exists.
+        let formatter = Formatter::Json;
+        let result = make_pipeline_result("utilize this", vec![make_finding(Severity::High)]);
+        let args = json_args();
+
+        // Redirect stdout via a captured buffer isn't straightforward in unit tests,
+        // so we verify the formatter selects the JSON path by calling render() on a
+        // PipelineResult and checking the output written to a temp file.
+        let dir = tempfile::tempdir().unwrap();
+        let out_path = dir.path().join("out.json");
+        let args_with_output = Args {
+            output: Some(out_path.to_str().unwrap().to_string()),
+            ..args
+        };
+
+        let had_findings = formatter
+            .render(result, &args_with_output)
+            .expect("Formatter::Json render should succeed");
+
+        let written = std::fs::read_to_string(&out_path).expect("output file should exist");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&written).expect("output must be valid JSON");
+
+        assert!(had_findings);
+        assert!(parsed.get("findings").is_some(), "JSON must have 'findings' key");
+        assert!(parsed.get("summary").is_some(), "JSON must have 'summary' key");
+        assert!(parsed.get("version").is_some(), "JSON must have 'version' key");
+    }
+
+    #[test]
+    fn formatter_text_does_not_produce_json() {
+        // Construct Formatter::Text directly — verifies the variant exists.
+        let formatter = Formatter::Text;
+        let result = make_pipeline_result("hello world\n", vec![]);
+        let args = text_args();
+
+        let dir = tempfile::tempdir().unwrap();
+        let out_path = dir.path().join("out.txt");
+        let args_with_output = Args {
+            output: Some(out_path.to_str().unwrap().to_string()),
+            ..args
+        };
+
+        formatter
+            .render(result, &args_with_output)
+            .expect("Formatter::Text render should succeed");
+
+        let written = std::fs::read_to_string(&out_path).expect("output file should exist");
+        // Text output should not be parseable as JSON object
+        assert!(
+            serde_json::from_str::<serde_json::Value>(&written).is_err()
+                || !written.trim_start().starts_with('{'),
+            "Text formatter must not emit JSON"
+        );
+    }
+
+    #[test]
+    fn formatter_from_args_selects_json() {
+        let args = json_args();
+        assert!(
+            matches!(Formatter::from_args(&args), Formatter::Json),
+            "FormatArg::Json must map to Formatter::Json"
+        );
+    }
+
+    #[test]
+    fn formatter_from_args_selects_text() {
+        let args = text_args();
+        assert!(
+            matches!(Formatter::from_args(&args), Formatter::Text),
+            "FormatArg::Text must map to Formatter::Text"
+        );
     }
 }

@@ -1,4 +1,6 @@
-.PHONY: build install test lint fmt fmt-check release release-patch release-minor release-major tag build-all install-hooks install-skill install-cursor
+.PHONY: build install test lint fmt fmt-check release release-patch release-minor release-major tag build-all setup install-hooks install-skill install-cursor
+
+setup: install-hooks
 
 build:
 	cargo build --manifest-path cli/Cargo.toml

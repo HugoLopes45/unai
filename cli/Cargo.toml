@@ -25,4 +25,6 @@ similar = "2.4"
 anstyle = "1.0"
 
 [dev-dependencies]
-tempfile = "3"
+# tempfile 3.20+ pulls getrandom 0.4.x (edition2024, requires Cargo 1.85).
+# Pin to 3.19.x to stay within MSRV 1.82.
+tempfile = "=3.19.1"

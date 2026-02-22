@@ -1,4 +1,4 @@
-use super::{Finding, Severity};
+use super::{is_word_boundary, Finding, Severity};
 
 /// Apply structural rules that catch paragraph-level patterns.
 /// These operate on whole-document structure, not individual lines.
@@ -37,8 +37,12 @@ pub fn apply_structural_rules(content: &str) -> Vec<Finding> {
                 let mut n = 0;
                 let mut start = 0;
                 while let Some(pos) = para_lower[start..].find(c) {
-                    n += 1;
-                    start += pos + c.len();
+                    let col = start + pos;
+                    let end = col + c.len();
+                    if is_word_boundary(&para_lower, col, end) {
+                        n += 1;
+                    }
+                    start = end;
                 }
                 n
             })

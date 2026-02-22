@@ -2,6 +2,17 @@
 
 All changes to this project are documented here.
 
+## v0.3.2 — 2026-02-22
+
+### Added
+- `prompts/agents.md` — plain-Markdown prompt (no frontmatter) for any tool that reads AGENTS.md-style files: opencode, Codex CLI, Amp, Zed, Cline, Amazon Q, Continue.dev, Windsurf, GitHub Copilot, and Aider. Replaces `prompts/opencode.md`.
+- Makefile: `install-opencode`, `install-codex`, `install-windsurf`, `install-zed`, `install-copilot`, `install-cline`, `install-amp`, `install-amazonq`, `install-continue`, `install-aider`, `install-all` targets.
+- `.gitignore`: entries for all project-local install outputs (`.rules`, `.clinerules`, `AGENTS.md`, `CONVENTIONS.md`, `.amazonq/`, `.continue/`).
+
+### Changed
+- `agents.md` synced with `claude-code.md`: getter-prefix rule added, "What not to touch" section added, five rule clarifications applied.
+- README install section restructured: Universal AGENTS.md table, Aider section, `install-all` convenience target.
+
 ## v0.3.1 — 2026-02-22
 
 ### Fixed

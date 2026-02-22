@@ -93,3 +93,21 @@ dist/
 
 # Copilot
 .github/copilot-instructions.md
+
+# Cline
+.clinerules
+
+# Zed
+.rules
+
+# Amp / opencode (project-local)
+AGENTS.md
+
+# Aider
+CONVENTIONS.md
+
+# Amazon Q
+.amazonq/
+
+# Continue.dev
+.continue/

@@ -92,6 +92,44 @@ make install-cursor   # copies prompts/cursor.mdc → .cursor/rules/unai.mdc
 
 Cursor picks up the rules on every generation in that project.
 
+### Universal: AGENTS.md integrations
+
+The `agents.md` prompt works with any tool that reads AGENTS.md-style files. One file, nine tools:
+
+| Tool | Command | File written |
+|------|---------|-------------|
+| opencode | `make install-opencode` | `~/.config/opencode/AGENTS.md` |
+| OpenAI Codex CLI | `make install-codex` | `~/.codex/AGENTS.md` |
+| Windsurf | `make install-windsurf` | `.windsurf/rules/unai.md` |
+| Zed | `make install-zed` | `.rules` |
+| GitHub Copilot | `make install-copilot` | `.github/copilot-instructions.md` |
+| Cline | `make install-cline` | `.clinerules` |
+| Amp | `make install-amp` | `AGENTS.md` (project root) |
+| Amazon Q | `make install-amazonq` | `.amazonq/rules/unai.md` |
+| Continue.dev | `make install-continue` | `.continue/rules/unai.md` |
+
+Only `install-opencode` and `install-codex` write to global config paths (`~`). All other targets write project-local files into your current directory — add them to `.gitignore` if you don't want to share them with your team.
+
+### Aider
+
+```bash
+make install-aider   # copies agents.md → CONVENTIONS.md
+```
+
+Then add to `.aider.conf.yml`:
+
+```yaml
+read: CONVENTIONS.md
+```
+
+### Install everything at once
+
+```bash
+make install-all
+```
+
+Installs Claude Code skill, Cursor rule, and all AGENTS.md integrations in one shot. Several targets write files into your current working directory — run this from your project root.
+
 ### Any LLM (ChatGPT, Gemini, API)
 
 Copy `prompts/system-prompt.md` into your system prompt. Done.

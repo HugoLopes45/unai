@@ -1,4 +1,4 @@
-.PHONY: build install test lint fmt fmt-check release release-patch release-minor release-major tag install-skill install-cursor
+.PHONY: build install test lint fmt fmt-check release release-patch release-minor release-major tag build-all install-hooks install-skill install-cursor
 
 build:
 	cargo build --manifest-path cli/Cargo.toml
@@ -20,6 +20,13 @@ fmt:
 
 fmt-check:
 	cargo fmt --manifest-path cli/Cargo.toml -- --check
+
+build-all:
+	./scripts/build-all.sh
+
+install-hooks:
+	git config core.hooksPath .githooks
+	@echo "Pre-push hook installed."
 
 release-patch:
 	./scripts/release.sh patch

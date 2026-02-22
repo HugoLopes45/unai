@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# .githooks/pre-push — runs before every `git push`.
+# Blocks the push if fmt or tests fail.
+#
+# Install once per clone:
+#   git config core.hooksPath .githooks
+set -euo pipefail
+
+MANIFEST="cli/Cargo.toml"
+
+echo "pre-push: fmt check..."
+if ! cargo fmt --manifest-path "$MANIFEST" -- --check 2>&1; then
+  echo ""
+  echo "pre-push: BLOCKED — rustfmt found formatting issues."
+  echo "Run: cargo fmt --manifest-path $MANIFEST"
+  exit 1
+fi
+
+echo "pre-push: clippy..."
+if ! cargo clippy --manifest-path "$MANIFEST" -- -D warnings 2>&1; then
+  echo ""
+  echo "pre-push: BLOCKED — clippy found warnings."
+  exit 1
+fi
+
+echo "pre-push: tests..."
+if ! cargo test --manifest-path "$MANIFEST" 2>&1; then
+  echo ""
+  echo "pre-push: BLOCKED — tests failed."
+  exit 1
+fi
+
+echo "pre-push: all checks passed."

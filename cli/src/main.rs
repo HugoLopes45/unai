@@ -353,6 +353,13 @@ fn run(args: Args) -> Result<bool> {
 fn read_input(file_arg: &Option<String>) -> Result<(String, Option<String>)> {
     match file_arg {
         Some(path) => {
+            let meta = fs::metadata(path).map_err(|source| UnaiError::FileRead {
+                path: path.into(),
+                source,
+            })?;
+            if meta.len() > MAX_STDIN_BYTES as u64 {
+                return Err(UnaiError::FileTooLarge { path: path.into() });
+            }
             let content = fs::read_to_string(path).map_err(|source| UnaiError::FileRead {
                 path: path.into(),
                 source,

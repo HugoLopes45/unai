@@ -227,8 +227,9 @@ fn color_never_no_ansi_in_report() {
 #[test]
 fn commit_editmsg_fires_commit_rules() {
     use std::io::Write as _;
-    let dir = std::env::temp_dir();
-    let path = dir.join("COMMIT_EDITMSG");
+    // Use a per-test temp directory so parallel test runs don't race on the same path.
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let path = dir.path().join("COMMIT_EDITMSG");
     let mut f = std::fs::File::create(&path).expect("create temp commit file");
     writeln!(f, "Added new feature").expect("write commit msg");
     drop(f);
@@ -240,7 +241,7 @@ fn commit_editmsg_fires_commit_rules() {
         .expect("failed to run unai on COMMIT_EDITMSG");
 
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-    std::fs::remove_file(&path).ok();
+    // `dir` drops here, cleaning up the temp directory automatically.
 
     assert!(
         stderr.contains("imperative") || stderr.contains("Past tense"),

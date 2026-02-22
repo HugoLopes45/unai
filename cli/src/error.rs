@@ -19,6 +19,9 @@ pub enum UnaiError {
     #[error("stdin input exceeds 64 MiB size limit")]
     StdinTooLarge,
 
+    #[error("'{path}' exceeds 64 MiB size limit")]
+    FileTooLarge { path: PathBuf },
+
     #[error("Cannot parse config at '{path}': {source}")]
     ConfigParse {
         path: PathBuf,

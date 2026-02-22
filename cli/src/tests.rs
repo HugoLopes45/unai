@@ -152,8 +152,7 @@ fn gather_findings_commit_msg_fires_commit_rules() {
 
 #[test]
 fn gather_findings_commit_msg_fires_both_text_and_commit_rules() {
-    let findings =
-        gather_findings("Added utilize to the codebase", &Mode::CommitMsg, &[], None);
+    let findings = gather_findings("Added utilize to the codebase", &Mode::CommitMsg, &[], None);
     assert!(
         findings
             .iter()
@@ -247,7 +246,11 @@ fn default_args(format: FormatArg) -> Args {
 #[test]
 fn formatter_json_produces_valid_json() {
     let formatter = Formatter::Json;
-    let result = make_pipeline_result("utilize this", vec![make_finding(Severity::High)], Mode::Text);
+    let result = make_pipeline_result(
+        "utilize this",
+        vec![make_finding(Severity::High)],
+        Mode::Text,
+    );
     let dir = tempfile::tempdir().unwrap();
     let out_path = dir.path().join("out.json");
     let args_with_output = Args {
@@ -264,9 +267,18 @@ fn formatter_json_produces_valid_json() {
         serde_json::from_str(&written).expect("output must be valid JSON");
 
     assert!(had_findings);
-    assert!(parsed.get("findings").is_some(), "JSON must have 'findings' key");
-    assert!(parsed.get("summary").is_some(), "JSON must have 'summary' key");
-    assert!(parsed.get("version").is_some(), "JSON must have 'version' key");
+    assert!(
+        parsed.get("findings").is_some(),
+        "JSON must have 'findings' key"
+    );
+    assert!(
+        parsed.get("summary").is_some(),
+        "JSON must have 'summary' key"
+    );
+    assert!(
+        parsed.get("version").is_some(),
+        "JSON must have 'version' key"
+    );
 }
 
 #[test]
@@ -285,7 +297,10 @@ fn formatter_text_passthrough_on_clean_input() {
         .expect("Formatter::Text render should succeed");
 
     let written = std::fs::read_to_string(&out_path).expect("output file should exist");
-    assert_eq!(written, "hello world\n", "text formatter should pass through clean content unchanged");
+    assert_eq!(
+        written, "hello world\n",
+        "text formatter should pass through clean content unchanged"
+    );
 }
 
 #[test]

@@ -2,6 +2,18 @@
 
 All changes to this project are documented here.
 
+## v0.3.1 — 2026-02-22
+
+### Fixed
+- User rule `col` offsets now point into the original line, not the lowercased copy — fixes incorrect `column` in JSON output and potential panics in `clean()` for non-ASCII input
+- Connector density check now uses word-boundary matching, preventing substring false positives (e.g. "consequently" inside "inconsequentially")
+- File inputs now enforce the same 64 MiB size limit as stdin
+- Integration test for `COMMIT_EDITMSG` detection uses an isolated temp directory, eliminating races in parallel test runs
+- `CWD_LOCK` mutex is now shared across both cwd-mutation tests so they correctly serialize
+
+### Performance
+- `lower_byte_to_char` offset mapping changed from O(n) linear scan to O(log n) binary search
+
 ## v0.2.0 — Research-grounded redesign (2026-02-20)
 
 ### Changed

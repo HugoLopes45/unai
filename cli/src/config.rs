@@ -58,11 +58,10 @@ impl Config {
                 path: path.into(),
                 source,
             })?;
-        let config: Config =
-            toml::from_str(&content).map_err(|source| UnaiError::ConfigParse {
-                path: path.into(),
-                source,
-            })?;
+        let config: Config = toml::from_str(&content).map_err(|source| UnaiError::ConfigParse {
+            path: path.into(),
+            source,
+        })?;
         config.validate()?;
         Ok(config)
     }
@@ -113,6 +112,11 @@ impl Config {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    // Shared lock for tests that mutate the process working directory.
+    // Both `missing_file_returns_none` and `load_from_cwd_success` must hold
+    // this lock to prevent races when Cargo runs tests in parallel.
+    static CWD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     fn write_temp_config(content: &str) -> tempfile::NamedTempFile {
         let mut f = tempfile::NamedTempFile::new().unwrap();
@@ -190,8 +194,6 @@ files = ["docs/examples/**", "test/fixtures/**"]
     #[test]
     fn missing_file_returns_none() {
         // load_from_cwd looks for ./unai.toml; run from a temp dir where it won't exist.
-        // Serialize cwd-mutation tests to avoid races when running in parallel.
-        static CWD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
         let _lock = CWD_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let original = std::env::current_dir().unwrap();
@@ -243,14 +245,13 @@ files = ["docs/examples/**", "test/fixtures/**"]
     // load_from_cwd success path — finds and loads a valid unai.toml from the working directory.
     #[test]
     fn load_from_cwd_success() {
-        use std::sync::Mutex;
-        // Serialize cwd-mutation tests to avoid races with other tests.
-        static CWD_LOCK: Mutex<()> = Mutex::new(());
         let _guard = CWD_LOCK.lock().unwrap();
 
         let tmp = tempfile::tempdir().unwrap();
         let original = std::env::current_dir().unwrap();
-        write_temp_config("version = 1\n").persist(tmp.path().join("unai.toml")).unwrap();
+        write_temp_config("version = 1\n")
+            .persist(tmp.path().join("unai.toml"))
+            .unwrap();
         std::env::set_current_dir(tmp.path()).unwrap();
         let result = Config::load_from_cwd();
         std::env::set_current_dir(original).unwrap();

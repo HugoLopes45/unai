@@ -141,7 +141,10 @@ mod tests {
 
     #[test]
     fn commit_mode_only_by_filename() {
-        assert_eq!(detect_mode(Some("COMMIT_EDITMSG"), "anything"), Mode::CommitMsg);
+        assert_eq!(
+            detect_mode(Some("COMMIT_EDITMSG"), "anything"),
+            Mode::CommitMsg
+        );
         assert_eq!(detect_mode(Some("MERGE_MSG"), "anything"), Mode::CommitMsg);
         assert_eq!(detect_mode(Some("SQUASH_MSG"), "anything"), Mode::CommitMsg);
     }

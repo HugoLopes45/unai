@@ -57,9 +57,9 @@ pub(crate) fn check_commit_patterns(line: &str, lineno: usize, findings: &mut Ve
             first_word
         };
         if past_tense_verbs.contains(&effective_first) {
-            let col = lower.find(effective_first).unwrap_or_else(|| {
-                lower.find(':').map(|p| p + 2).unwrap_or(0)
-            });
+            let col = lower
+                .find(effective_first)
+                .unwrap_or_else(|| lower.find(':').map(|p| p + 2).unwrap_or(0));
             findings.push(Finding {
                 line: lineno,
                 col,
@@ -144,8 +144,8 @@ pub(crate) fn check_commit_patterns(line: &str, lineno: usize, findings: &mut Ve
 
 #[cfg(test)]
 mod tests {
-    use super::super::{apply_code_rules, CodeRule};
     use super::super::Severity;
+    use super::super::{apply_code_rules, CodeRule};
 
     #[test]
     fn commit_past_tense_fires() {

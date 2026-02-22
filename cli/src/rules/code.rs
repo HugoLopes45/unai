@@ -1,5 +1,5 @@
-use super::{Finding, Severity};
 use super::commit::check_commit_patterns;
+use super::{Finding, Severity};
 
 /// Which code rule categories to apply.
 #[derive(Debug, Clone, PartialEq)]

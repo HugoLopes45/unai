@@ -66,7 +66,8 @@ mod tests {
 
     #[test]
     fn html_block_ignore() {
-        let content = "line 1\n<!-- unai-ignore -->\nline 3\nline 4\n<!-- /unai-ignore -->\nline 6\n";
+        let content =
+            "line 1\n<!-- unai-ignore -->\nline 3\nline 4\n<!-- /unai-ignore -->\nline 6\n";
         let ignored = collect_ignored_lines(content);
         assert!(!ignored.contains(&1));
         assert!(ignored.contains(&3));
@@ -86,8 +87,7 @@ mod tests {
 
     #[test]
     fn start_end_block() {
-        let content =
-            "line 1\n// unai-ignore-start\nline 3\nline 4\n// unai-ignore-end\nline 6\n";
+        let content = "line 1\n// unai-ignore-start\nline 3\nline 4\n// unai-ignore-end\nline 6\n";
         let ignored = collect_ignored_lines(content);
         assert!(!ignored.contains(&1));
         assert!(ignored.contains(&3));
@@ -97,8 +97,7 @@ mod tests {
 
     #[test]
     fn hash_start_end_block() {
-        let content =
-            "line 1\n# unai-ignore-start\nline 3\nline 4\n# unai-ignore-end\nline 6\n";
+        let content = "line 1\n# unai-ignore-start\nline 3\nline 4\n# unai-ignore-end\nline 6\n";
         let ignored = collect_ignored_lines(content);
         assert!(!ignored.contains(&1));
         assert!(ignored.contains(&3));

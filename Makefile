@@ -1,4 +1,4 @@
-.PHONY: build install test lint fmt fmt-check release tag install-skill install-cursor
+.PHONY: build install test lint fmt fmt-check release release-patch release-minor release-major tag install-skill install-cursor
 
 build:
 	cargo build --manifest-path cli/Cargo.toml
@@ -20,6 +20,15 @@ fmt:
 
 fmt-check:
 	cargo fmt --manifest-path cli/Cargo.toml -- --check
+
+release-patch:
+	./scripts/release.sh patch
+
+release-minor:
+	./scripts/release.sh minor
+
+release-major:
+	./scripts/release.sh major
 
 tag:
 	git tag -a v$(shell grep '^version' cli/Cargo.toml | head -1 | cut -d'"' -f2) \

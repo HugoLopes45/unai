@@ -40,24 +40,21 @@ jobs:
         run: cargo fmt --manifest-path cli/Cargo.toml -- --check
 
   msrv:
-    name: MSRV (Rust 1.75)
+    name: MSRV (Rust 1.82)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust 1.75
+      - name: Install Rust 1.82
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.75"
+          toolchain: "1.82"
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: cli
-
-      - name: Remove lock file (Cargo.lock v4 is unreadable by Cargo 1.75)
-        run: rm -f cli/Cargo.lock
 
       - name: Run tests on MSRV
         run: cargo test --manifest-path cli/Cargo.toml

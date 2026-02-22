@@ -24,12 +24,10 @@ fn run_unai(args: &[&str], stdin: &str) -> (String, String, i32) {
         .spawn()
         .expect("failed to spawn unai binary");
 
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(stdin.as_bytes())
-        .unwrap();
+    // Ignore BrokenPipe: the process may exit before consuming all stdin (e.g. config errors).
+    if let Some(mut handle) = child.stdin.take() {
+        let _ = handle.write_all(stdin.as_bytes());
+    }
 
     let output = child.wait_with_output().expect("failed to wait on child");
 
@@ -130,7 +128,11 @@ fn min_severity_high_filters_low() {
 fn fail_flag_exits_10_with_findings() {
     let input = "Certainly! Let me delve into this.\n";
     let (_stdout, _stderr, code) = run_unai(&["--fail", "--report"], input);
-    assert_eq!(code, 10, "--fail should exit 10 when findings exist, got: {}", code);
+    assert_eq!(
+        code, 10,
+        "--fail should exit 10 when findings exist, got: {}",
+        code
+    );
 }
 
 /// --fail exits 0 when no findings.
@@ -138,7 +140,11 @@ fn fail_flag_exits_10_with_findings() {
 fn fail_flag_exits_0_without_findings() {
     let input = "The cat sat on the mat.\n";
     let (_stdout, _stderr, code) = run_unai(&["--fail"], input);
-    assert_eq!(code, 0, "--fail should exit 0 when no findings, got: {}", code);
+    assert_eq!(
+        code, 0,
+        "--fail should exit 0 when no findings, got: {}",
+        code
+    );
 }
 
 /// --format json outputs valid JSON with expected fields.
@@ -149,9 +155,18 @@ fn format_json_valid_output() {
     assert_eq!(code, 0);
     let parsed: serde_json::Value =
         serde_json::from_str(&stdout).expect("--format json should output valid JSON");
-    assert!(parsed.get("findings").is_some(), "JSON must have 'findings' key");
-    assert!(parsed.get("summary").is_some(), "JSON must have 'summary' key");
-    assert!(parsed.get("version").is_some(), "JSON must have 'version' key");
+    assert!(
+        parsed.get("findings").is_some(),
+        "JSON must have 'findings' key"
+    );
+    assert!(
+        parsed.get("summary").is_some(),
+        "JSON must have 'summary' key"
+    );
+    assert!(
+        parsed.get("version").is_some(),
+        "JSON must have 'version' key"
+    );
 }
 
 /// --format json summary counts are correct.
@@ -163,7 +178,10 @@ fn format_json_summary_counts() {
     let total = parsed["summary"]["total"].as_u64().unwrap_or(0);
     assert!(total > 0, "summary.total should be > 0 for 'Certainly!'");
     let critical = parsed["summary"]["critical"].as_u64().unwrap_or(0);
-    assert!(critical > 0, "summary.critical should be > 0 for 'Certainly!'");
+    assert!(
+        critical > 0,
+        "summary.critical should be > 0 for 'Certainly!'"
+    );
 }
 
 /// Inline ignore directive suppresses findings on ignored lines (T8 strengthened).
@@ -290,10 +308,8 @@ fn fail_with_min_severity_high_exits_0_for_low_only() {
 fn invalid_config_exits_2() {
     let toml = "version = 99\n";
     let cfg = write_temp_config(toml);
-    let (_stdout, _stderr, code) = run_unai(
-        &["--config", cfg.path().to_str().unwrap()],
-        "some input\n",
-    );
+    let (_stdout, _stderr, code) =
+        run_unai(&["--config", cfg.path().to_str().unwrap()], "some input\n");
     assert_eq!(
         code, 2,
         "invalid config should exit with code 2, got: {}",
@@ -336,7 +352,10 @@ fn format_json_fail_exits_10_with_findings() {
         "--format json --fail should exit 10 when findings exist, got: {}",
         code
     );
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).expect("--format json should output valid JSON even with --fail");
-    assert!(parsed.get("findings").is_some(), "JSON must have 'findings'");
+    let parsed: serde_json::Value = serde_json::from_str(&stdout)
+        .expect("--format json should output valid JSON even with --fail");
+    assert!(
+        parsed.get("findings").is_some(),
+        "JSON must have 'findings'"
+    );
 }

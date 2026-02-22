@@ -153,11 +153,7 @@ struct JsonSummary {
     low: usize,
 }
 
-fn build_json_report(
-    findings: &[Finding],
-    mode: &Mode,
-    filename: Option<&str>,
-) -> JsonReport {
+fn build_json_report(findings: &[Finding], mode: &Mode, filename: Option<&str>) -> JsonReport {
     let json_findings: Vec<JsonFinding> = findings
         .iter()
         .map(|f| JsonFinding {
@@ -174,10 +170,22 @@ fn build_json_report(
 
     let summary = JsonSummary {
         total: findings.len(),
-        critical: findings.iter().filter(|f| f.severity == Severity::Critical).count(),
-        high: findings.iter().filter(|f| f.severity == Severity::High).count(),
-        medium: findings.iter().filter(|f| f.severity == Severity::Medium).count(),
-        low: findings.iter().filter(|f| f.severity == Severity::Low).count(),
+        critical: findings
+            .iter()
+            .filter(|f| f.severity == Severity::Critical)
+            .count(),
+        high: findings
+            .iter()
+            .filter(|f| f.severity == Severity::High)
+            .count(),
+        medium: findings
+            .iter()
+            .filter(|f| f.severity == Severity::Medium)
+            .count(),
+        low: findings
+            .iter()
+            .filter(|f| f.severity == Severity::Low)
+            .count(),
     };
 
     JsonReport {
@@ -427,9 +435,7 @@ fn gather_findings(
             let mut findings = apply_code_rules(content, effective_rules);
             // Ensure commit rules fire for commit message files when the caller restricted
             // rules and did not explicitly include commits.
-            if is_commit_file
-                && !code_rules.is_empty()
-                && !code_rules.contains(&CodeRule::Commits)
+            if is_commit_file && !code_rules.is_empty() && !code_rules.contains(&CodeRule::Commits)
             {
                 findings.extend(apply_code_rules(content, &[CodeRule::Commits]));
             }
@@ -559,6 +565,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(unix)]
     fn write_output_refuses_symlink() {
         use std::os::unix::fs::symlink;
         let dir = tempfile::tempdir().unwrap();

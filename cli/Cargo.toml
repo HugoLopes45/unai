@@ -9,7 +9,7 @@ keywords = ["linter", "ai", "style", "llm", "text"]
 categories = ["command-line-utilities", "text-processing"]
 readme = "../README.md"
 exclude = [".github/", "prompts/", "rules/", ".forge/"]
-rust-version = "1.75"
+rust-version = "1.82"
 
 [[bin]]
 name = "unai"

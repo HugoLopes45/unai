@@ -1,42 +1,94 @@
+# =============================================================================
 # Rust
+# =============================================================================
 target/
-# Keep Cargo.lock for binaries, omit for libraries
-# Cargo.lock
+**/*.rs.bk
 
-# Node / tooling
-node_modules/
-npm-debug.log*
-yarn-error.log
-.pnpm-debug.log*
-dist/
-.cache/
-
+# =============================================================================
 # OS
+# =============================================================================
+
+# macOS
 .DS_Store
-.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
-Thumbs.db
+.fseventsd
+.AppleDouble
+.LSOverride
 
-# Editors
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# =============================================================================
+# Editors & IDEs
+# =============================================================================
+
+# VSCode
 .vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# JetBrains
 .idea/
+*.iml
+
+# Vim / Neovim
 *.swp
 *.swo
-*~
-.project
-.classpath
-.settings/
+.netrwhist
 
-# Environment
+# Emacs
+\#*\#
+.#*
+
+# Sublime Text
+*.sublime-workspace
+
+# =============================================================================
+# Environment & secrets
+# =============================================================================
 .env
 .env.local
 .env.*.local
+*.pem
+*.key
+secrets.toml
 
-# Build outputs
-out/
-build/
+# =============================================================================
+# Build & release artifacts
+# =============================================================================
 *.tar.gz
 *.zip
+*.deb
+*.rpm
+
+# =============================================================================
+# AI / tooling
+# =============================================================================
+
+# Claude Code
+.claude/
+
+# Cursor
+.cursor/
+.cursorignore
+.cursorindexingignore
+
+# Windsurf
+.windsurf/
+
+# Warp
+.warp/
+
+# Forge
+.forge/
+
+# Copilot
+.github/copilot-instructions.md

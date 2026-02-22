@@ -1,8 +1,8 @@
 [package]
 name = "unai"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
-description = "Remove LLM-isms from text and code"
+description = "Detect and remove LLM-isms from text, code comments, and commit messages"
 license = "MIT"
 repository = "https://github.com/HugoLopes45/unai"
 keywords = ["linter", "ai", "style", "llm", "text"]
@@ -17,3 +17,12 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
+thiserror = "1.0"
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+similar = "2.4"
+anstyle = "1.0"
+
+[dev-dependencies]
+tempfile = "3"

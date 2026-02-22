@@ -130,4 +130,19 @@ mod tests {
             Mode::CommitMsg
         );
     }
+
+    #[test]
+    fn never_infer_commit_mode_from_content() {
+        // This was the bug: short first line triggered commit mode
+        assert_eq!(detect_mode(None, "Of course!"), Mode::Text);
+        assert_eq!(detect_mode(None, "Of course! Let me help you."), Mode::Text);
+        assert_eq!(detect_mode(None, "wip"), Mode::Text);
+    }
+
+    #[test]
+    fn commit_mode_only_by_filename() {
+        assert_eq!(detect_mode(Some("COMMIT_EDITMSG"), "anything"), Mode::CommitMsg);
+        assert_eq!(detect_mode(Some("MERGE_MSG"), "anything"), Mode::CommitMsg);
+        assert_eq!(detect_mode(Some("SQUASH_MSG"), "anything"), Mode::CommitMsg);
+    }
 }
